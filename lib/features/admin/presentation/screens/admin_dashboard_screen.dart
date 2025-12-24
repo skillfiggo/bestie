@@ -2,6 +2,10 @@ import 'package:bestie/features/auth/data/providers/auth_providers.dart';
 import 'package:bestie/features/admin/data/repositories/admin_repository.dart';
 import 'package:bestie/features/admin/presentation/screens/admin_verification_screen.dart';
 import 'package:bestie/features/admin/presentation/screens/admin_banner_editor_screen.dart';
+import 'package:bestie/features/admin/presentation/screens/admin_analytics_screen.dart';
+import 'package:bestie/features/admin/presentation/screens/admin_reports_screen.dart';
+import 'package:bestie/features/admin/presentation/screens/admin_user_management_screen.dart';
+import 'package:bestie/features/admin/presentation/screens/admin_broadcast_screen.dart';
 import 'package:bestie/features/home/domain/models/profile_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -79,25 +83,111 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
         iconTheme: const IconThemeData(color: Colors.black),
         titleTextStyle: const TextStyle(color: Colors.black, fontSize: 20, fontWeight: FontWeight.bold),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.verified_user, color: Colors.blue),
-            tooltip: 'Verification Requests',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const AdminVerificationScreen()),
-              );
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert, color: Colors.black),
+            tooltip: 'Admin Tools',
+            onSelected: (value) {
+              switch (value) {
+                case 'analytics':
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AdminAnalyticsScreen()),
+                  );
+                  break;
+                case 'users':
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AdminUserManagementScreen()),
+                  );
+                  break;
+                case 'reports':
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AdminReportsScreen()),
+                  );
+                  break;
+                case 'verification':
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AdminVerificationScreen()),
+                  );
+                  break;
+                case 'broadcast':
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AdminBroadcastScreen()),
+                  );
+                  break;
+                case 'banner':
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AdminBannerEditorScreen()),
+                  );
+                  break;
+              }
             },
-          ),
-          IconButton(
-            icon: const Icon(Icons.campaign, color: Colors.orange),
-            tooltip: 'Manage Banner Ads',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const AdminBannerEditorScreen()),
-              );
-            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'analytics',
+                child: Row(
+                  children: [
+                    Icon(Icons.analytics, color: Colors.green, size: 20),
+                    SizedBox(width: 12),
+                    Text('Analytics Dashboard'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'users',
+                child: Row(
+                  children: [
+                    Icon(Icons.people_alt, color: Colors.blue, size: 20),
+                    SizedBox(width: 12),
+                    Text('Manage Users'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'reports',
+                child: Row(
+                  children: [
+                    Icon(Icons.flag, color: Colors.red, size: 20),
+                    SizedBox(width: 12),
+                    Text('Content Reports'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'verification',
+                child: Row(
+                  children: [
+                    Icon(Icons.verified_user, color: Colors.blue, size: 20),
+                    SizedBox(width: 12),
+                    Text('Verification Requests'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'broadcast',
+                child: Row(
+                  children: [
+                    Icon(Icons.campaign, color: Colors.purple, size: 20),
+                    SizedBox(width: 12),
+                    Text('Broadcast Messages'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'banner',
+                child: Row(
+                  children: [
+                    Icon(Icons.image, color: Colors.orange, size: 20), // Changed icon to image as 'campaign' is now used for broadcast
+                    SizedBox(width: 12),
+                    Text('Manage Banner Ads'),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),

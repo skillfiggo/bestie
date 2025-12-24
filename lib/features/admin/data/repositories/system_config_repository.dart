@@ -42,8 +42,8 @@ class SystemConfigRepository {
     }
   }
 
-  /// Fetch banner image URL
-  Future<String> fetchBannerImage() async {
+  /// Fetch banner images URL (List)
+  Future<List<String>> fetchBannerImages() async {
     try {
       final response = await _client
           .from('app_config')
@@ -52,25 +52,35 @@ class SystemConfigRepository {
           .maybeSingle();
 
       if (response == null) {
-        return 'https://images.unsplash.com/photo-1474044158699-59270e99d211';
+        return [
+          'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80'
+        ];
       }
 
-      return response['value'].toString();
+      final data = response['value'];
+      if (data is List) {
+        return data.map((e) => e.toString()).toList();
+      } else {
+         // Handle legacy single string format
+         return [data.toString()];
+      }
     } catch (e) {
-      return 'https://images.unsplash.com/photo-1474044158699-59270e99d211';
+      return [
+        'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80'
+      ];
     }
   }
 
-  /// Update banner image URL
-  Future<void> updateBannerImage(String imageUrl) async {
+  /// Update banner images URLs
+  Future<void> updateBannerImages(List<String> imageUrls) async {
     try {
       await _client.from('app_config').upsert({
         'key': 'home_banner_image',
-        'value': imageUrl,
+        'value': imageUrls, // Supabase handles List<String> as JSON array
         'updated_at': DateTime.now().toIso8601String(),
       });
     } catch (e) {
-      throw Exception('Failed to update banner image: $e');
+      throw Exception('Failed to update banner images: $e');
     }
   }
 }

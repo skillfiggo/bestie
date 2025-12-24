@@ -14,6 +14,9 @@ import 'package:bestie/features/moment/data/providers/moment_providers.dart';
 import 'package:bestie/features/profile/data/providers/profile_visit_providers.dart';
 import 'package:bestie/features/admin/data/repositories/admin_repository.dart';
 
+import 'package:bestie/features/admin/presentation/widgets/report_dialog.dart';
+import 'package:bestie/features/admin/data/repositories/reports_repository.dart';
+
 class UserProfileScreen extends ConsumerStatefulWidget {
   final String userId;
 
@@ -65,6 +68,66 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                   icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
                   onPressed: () => Navigator.pop(context),
                 ),
+                actions: [
+                  profileAsync.when(
+                    data: (profile) {
+                      if (profile == null) return const SizedBox.shrink();
+                      return PopupMenuButton<String>(
+                        icon: const Icon(Icons.more_vert, color: AppColors.textPrimary),
+                        onSelected: (value) async {
+                          if (value == 'report') {
+                            showReportDialog(
+                              context,
+                              reportedUserId: profile.id,
+                              reportedUserName: profile.name,
+                              reportType: 'user',
+                            );
+                          } else if (value == 'block') {
+                            try {
+                              await ref.read(reportsRepositoryProvider).blockUser(profile.id);
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Blocked ${profile.name}')),
+                                );
+                                Navigator.pop(context); // Exit profile after blocking
+                              }
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Error blocking user: $e')),
+                                );
+                              }
+                            }
+                          }
+                        },
+                        itemBuilder: (context) => [
+                          const PopupMenuItem(
+                            value: 'report',
+                            child: Row(
+                              children: [
+                                Icon(Icons.flag, color: Colors.orange),
+                                SizedBox(width: 8),
+                                Text('Report User'),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuItem(
+                            value: 'block',
+                            child: Row(
+                              children: [
+                                Icon(Icons.block, color: Colors.red),
+                                SizedBox(width: 8),
+                                Text('Block User'),
+                              ],
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                    loading: () => const SizedBox.shrink(),
+                    error: (_, __) => const SizedBox.shrink(),
+                  ),
+                ],
                 title: Text(
                   innerBoxIsScrolled ? 'Profile' : '',
                   style: const TextStyle(

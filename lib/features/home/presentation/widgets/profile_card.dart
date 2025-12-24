@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:bestie/core/constants/app_colors.dart';
 import 'package:bestie/features/home/domain/models/profile_model.dart';
+import 'package:bestie/features/admin/presentation/widgets/report_dialog.dart';
 
 class ProfileCard extends StatelessWidget {
   final ProfileModel profile;
@@ -60,6 +61,34 @@ class ProfileCard extends StatelessWidget {
                         ),
                       );
                     },
+                  ),
+                ),
+
+                // Report Button (Top Left)
+                Positioned(
+                  top: 16,
+                  left: 16,
+                  child: GestureDetector(
+                    onTap: () {
+                      showReportDialog(
+                        context,
+                        reportedUserId: profile.id,
+                        reportedUserName: profile.name,
+                        reportType: 'profile',
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.4),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.flag_outlined,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
                   ),
                 ),
                 

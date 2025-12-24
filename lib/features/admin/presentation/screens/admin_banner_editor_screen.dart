@@ -14,7 +14,7 @@ class _AdminBannerEditorScreenState extends ConsumerState<AdminBannerEditorScree
   bool _isLoading = true;
   List<String> _ads = [];
   final TextEditingController _textController = TextEditingController();
-  final TextEditingController _imageController = TextEditingController();
+  final List<TextEditingController> _imageControllers = [];
 
   @override
   void initState() {
@@ -25,7 +25,9 @@ class _AdminBannerEditorScreenState extends ConsumerState<AdminBannerEditorScree
   @override
   void dispose() {
     _textController.dispose();
-    _imageController.dispose();
+    for (var controller in _imageControllers) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -35,11 +37,11 @@ class _AdminBannerEditorScreenState extends ConsumerState<AdminBannerEditorScree
       final repo = ref.read(systemConfigRepositoryProvider);
       final results = await Future.wait([
         repo.fetchBannerAds(),
-        repo.fetchBannerImage(),
+        repo.fetchBannerImages(),
       ]);
 
       final ads = results[0] as List<String>;
-      final image = results[1] as String;
+      final images = results[1] as List<String>;
 
       setState(() {
         _ads = ads.isNotEmpty ? ads : [
@@ -48,7 +50,16 @@ class _AdminBannerEditorScreenState extends ConsumerState<AdminBannerEditorScree
             "💎 Verify your profile for free badge",
             "🚀 Boost your profile to get more views",
         ];
-        _imageController.text = image;
+        
+        _imageControllers.clear();
+        for (var img in images) {
+          _imageControllers.add(TextEditingController(text: img));
+        }
+        // Ensure at least one field if empty
+        if (_imageControllers.isEmpty) {
+           _imageControllers.add(TextEditingController(text: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80'));
+        }
+
         _isLoading = false;
       });
     } catch (e) {
@@ -61,11 +72,43 @@ class _AdminBannerEditorScreenState extends ConsumerState<AdminBannerEditorScree
 
   Future<void> _saveData() async {
     setState(() => _isLoading = true);
+    
+    // Validation
+    for (var controller in _imageControllers) {
+      final text = controller.text.trim();
+      if (text.contains('unsplash.com/photos/')) {
+        setState(() => _isLoading = false);
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Invalid Image Link'),
+            content: const Text(
+              'It looks like you pasted a link to the Unsplash website instead of the image setup.\n\n'
+              'Please go back to the website, right-click the image, and select "Copy Image Address".\n\n'
+              'The link should usually start with "images.unsplash.com" or end with .jpg/.png',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+    }
+
     try {
       final repo = ref.read(systemConfigRepositoryProvider);
+      final images = _imageControllers
+          .map((c) => c.text.trim())
+          .where((text) => text.isNotEmpty)
+          .toList();
+
       await Future.wait([
         repo.updateBannerAds(_ads),
-        repo.updateBannerImage(_imageController.text.trim()),
+        repo.updateBannerImages(images),
       ]);
 
       if (mounted) {
@@ -97,6 +140,25 @@ class _AdminBannerEditorScreenState extends ConsumerState<AdminBannerEditorScree
     });
   }
 
+  void _addImageField() {
+    if (_imageControllers.length < 3) {
+      setState(() {
+        _imageControllers.add(TextEditingController());
+      });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Maximum 3 images allowed')),
+      );
+    }
+  }
+
+  void _removeImageField(int index) {
+    setState(() {
+      _imageControllers[index].dispose();
+      _imageControllers.removeAt(index);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -123,19 +185,47 @@ class _AdminBannerEditorScreenState extends ConsumerState<AdminBannerEditorScree
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Banner Image URL', style: TextStyle(fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: _imageController,
-                        decoration: InputDecoration(
-                          hintText: 'https://...',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          suffixIcon: const Icon(Icons.image),
-                        ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Banner Images (Max 3)', style: TextStyle(fontWeight: FontWeight.bold)),
+                          if (_imageControllers.length < 3)
+                            TextButton.icon(
+                              onPressed: _addImageField,
+                              icon: const Icon(Icons.add_photo_alternate),
+                              label: const Text('Add Image'),
+                            ),
+                        ],
                       ),
+                      const SizedBox(height: 8),
+                      ...List.generate(_imageControllers.length, (index) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8.0),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _imageControllers[index],
+                                  decoration: InputDecoration(
+                                    hintText: 'https://...',
+                                    labelText: 'Image ${index + 1}',
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    suffixIcon: const Icon(Icons.image),
+                                  ),
+                                ),
+                              ),
+                              if (_imageControllers.length > 1)
+                                IconButton(
+                                  icon: const Icon(Icons.delete, color: Colors.red),
+                                  onPressed: () => _removeImageField(index),
+                                ),
+                            ],
+                          ),
+                        );
+                      }),
                       const SizedBox(height: 24),
                       const Text('Banner Text', style: TextStyle(fontWeight: FontWeight.bold)),
                       const SizedBox(height: 8),

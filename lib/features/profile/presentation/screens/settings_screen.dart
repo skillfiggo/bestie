@@ -5,6 +5,8 @@ import 'package:bestie/features/auth/data/repositories/auth_repository.dart';
 import 'package:bestie/features/auth/data/providers/auth_providers.dart';
 import 'package:bestie/app/router.dart';
 import 'package:bestie/features/profile/presentation/screens/edit_profile_screen.dart';
+import 'package:bestie/features/profile/presentation/screens/privacy_settings_screen.dart';
+import 'package:bestie/features/profile/presentation/screens/notification_settings_screen.dart';
 import 'package:bestie/features/admin/presentation/screens/admin_dashboard_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -194,12 +196,7 @@ class SettingsScreen extends ConsumerWidget {
           ),
 
           _buildSectionHeader('Account Settings'),
-          _buildSettingsTile(
-            context,
-            icon: Icons.person_outline_rounded,
-            title: 'Personal Information',
-            color: Colors.blue,
-          ),
+
           _buildSettingsTile(
             context,
             icon: Icons.lock_outline_rounded,
@@ -212,12 +209,28 @@ class SettingsScreen extends ConsumerWidget {
             title: 'Notifications',
             color: Colors.orange,
             showBadge: true,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const NotificationSettingsScreen(),
+                ),
+              );
+            },
           ),
           _buildSettingsTile(
             context,
             icon: Icons.privacy_tip_outlined,
             title: 'Privacy',
             color: Colors.purple,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const PrivacySettingsScreen(),
+                ),
+              );
+            },
           ),
 
           const SizedBox(height: 24),

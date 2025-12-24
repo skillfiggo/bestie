@@ -1,5 +1,6 @@
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bestie/core/constants/app_colors.dart';
 import 'package:bestie/features/chat/domain/models/chat_model.dart';
@@ -11,6 +12,8 @@ import 'package:intl/intl.dart';
 import 'package:bestie/features/calling/presentation/screens/call_screen.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:bestie/features/chat/data/repositories/call_repository.dart';
+import 'package:bestie/features/profile/presentation/screens/user_profile_screen.dart';
+import 'package:bestie/features/admin/presentation/widgets/report_dialog.dart';
 
 class ChatDetailScreen extends ConsumerStatefulWidget {
   final ChatModel chat;
@@ -192,6 +195,52 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     );
   }
 
+  void _showMessageOptions(BuildContext context, Message message) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SafeArea(
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (message.type == MessageType.text)
+                ListTile(
+                  leading: const Icon(Icons.copy),
+                  title: const Text('Copy Text'),
+                  onTap: () {
+                    Clipboard.setData(ClipboardData(text: message.content));
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Message copied')),
+                    );
+                  },
+                ),
+              if (message.senderId != currentUserId)
+                ListTile(
+                  leading: const Icon(Icons.flag, color: Colors.orange),
+                  title: const Text('Report Message'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    showReportDialog(
+                      context,
+                      reportedUserId: message.senderId,
+                      reportedUserName: widget.chat.name,
+                      reportType: 'message',
+                      reportedMessageId: message.id,
+                    );
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _handleStartCall({required bool isVideo}) async {
     // Prevent duplicate calls
     if (_isStartingCall) {
@@ -345,6 +394,23 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                         const SizedBox(width: 4),
                         const Icon(Icons.verified, color: Colors.blue, size: 16),
                       ],
+                      if (widget.chat.streakCount > 0 && widget.chat.lastStreakUpdate != null) ...[
+                        const SizedBox(width: 8),
+                        Builder(builder: (context) {
+                          final now = DateTime.now();
+                          final last = widget.chat.lastStreakUpdate!.toLocal();
+                          final diff = DateTime(now.year, now.month, now.day)
+                              .difference(DateTime(last.year, last.month, last.day))
+                              .inDays;
+                          
+                          if (diff == 0) {
+                             return Text('🔥 ${widget.chat.streakCount}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16));
+                          } else if (diff == 1) {
+                             return Text('⌛ ${widget.chat.streakCount}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16));
+                          }
+                          return const SizedBox.shrink();
+                        }),
+                      ],
                     ],
                   ),
                   Text(
@@ -366,8 +432,22 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, color: AppColors.textPrimary),
             onSelected: (value) {
-              if (value == 'Clear Chat') {
+              if (value == 'View Profile') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => UserProfileScreen(userId: widget.chat.otherUserId),
+                  ),
+                );
+              } else if (value == 'Clear Chat') {
                 _handleClearChat();
+              } else if (value == 'Report') {
+                showReportDialog(
+                  context,
+                  reportedUserId: widget.chat.otherUserId,
+                  reportedUserName: widget.chat.name,
+                  reportType: 'user',
+                );
               }
             },
             itemBuilder: (context) => [
@@ -378,6 +458,16 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
               const PopupMenuItem(
                 value: 'Clear Chat',
                 child: Text('Clear Chat'),
+              ),
+              const PopupMenuItem(
+                value: 'Report',
+                child: Row(
+                  children: [
+                    Icon(Icons.flag, color: Colors.orange, size: 20),
+                    SizedBox(width: 8),
+                    Text('Report User'),
+                  ],
+                ),
               ),
             ],
           ),
@@ -439,7 +529,12 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                       return Column(
                         children: [
                           if (showDateDivider) _buildDateDivider(message.createdAt),
-                          MessageBubble(message: message, isMe: isMe),
+                          GestureDetector(
+                            onLongPress: () {
+                              _showMessageOptions(context, message);
+                            },
+                            child: MessageBubble(message: message, isMe: isMe),
+                          ),
                         ],
                       );
                     },

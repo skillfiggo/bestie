@@ -12,9 +12,12 @@ class AdBanner extends ConsumerStatefulWidget {
 }
 
 class _AdBannerState extends ConsumerState<AdBanner> {
-  final PageController _pageController = PageController();
-  int _currentPage = 0;
-  Timer? _timer;
+  final PageController _textPageController = PageController();
+  final PageController _imagePageController = PageController();
+  int _currentTextPage = 0;
+  int _currentImagePage = 0;
+  Timer? _textTimer;
+  Timer? _imageTimer;
 
   List<String> _ads = [
     "🎉 Premium discounts available now!",
@@ -22,13 +25,16 @@ class _AdBannerState extends ConsumerState<AdBanner> {
     "💎 Verify your profile for free badge",
     "🚀 Boost your profile to get more views",
   ];
-  String _bannerImage = 'https://images.unsplash.com/photo-1474044158699-59270e99d211';
+  
+  List<String> _bannerImages = [
+    'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80'
+  ];
 
   @override
   void initState() {
     super.initState();
     _loadDynamicContent();
-    _startAutoScroll();
+    _startTimers();
   }
 
   Future<void> _loadDynamicContent() async {
@@ -36,22 +42,28 @@ class _AdBannerState extends ConsumerState<AdBanner> {
       final repo = ref.read(systemConfigRepositoryProvider);
       final results = await Future.wait([
         repo.fetchBannerAds(),
-        repo.fetchBannerImage(),
+        repo.fetchBannerImages(),
       ]);
 
       final dynamicAds = results[0] as List<String>;
-      final dynamicImage = results[1] as String;
+      final dynamicImages = results[1] as List<String>;
 
       if (mounted) {
         setState(() {
           if (dynamicAds.isNotEmpty) {
             _ads = dynamicAds;
-            if (_currentPage >= _ads.length) {
-              _currentPage = 0;
-              _pageController.jumpToPage(0);
+            if (_currentTextPage >= _ads.length) {
+              _currentTextPage = 0;
+              _textPageController.jumpToPage(0);
             }
           }
-          _bannerImage = dynamicImage;
+          if (dynamicImages.isNotEmpty) {
+            _bannerImages = dynamicImages;
+            if (_currentImagePage >= _bannerImages.length) {
+              _currentImagePage = 0;
+              _imagePageController.jumpToPage(0);
+            }
+          }
         });
       }
     } catch (e) {
@@ -59,19 +71,37 @@ class _AdBannerState extends ConsumerState<AdBanner> {
     }
   }
 
-  void _startAutoScroll() {
-    _timer = Timer.periodic(const Duration(seconds: 3), (timer) {
-      if (!_pageController.hasClients) return;
+  void _startTimers() {
+    // Text Auto Scroll
+    _textTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
+      if (!_textPageController.hasClients) return;
       
-      if (_currentPage < _ads.length - 1) {
-        _currentPage++;
+      if (_currentTextPage < _ads.length - 1) {
+        _currentTextPage++;
       } else {
-        _currentPage = 0;
+        _currentTextPage = 0;
       }
 
-      _pageController.animateToPage(
-        _currentPage,
+      _textPageController.animateToPage(
+        _currentTextPage,
         duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    });
+
+    // Image Auto Scroll (slower)
+    _imageTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (!_imagePageController.hasClients || _bannerImages.length <= 1) return;
+      
+      if (_currentImagePage < _bannerImages.length - 1) {
+        _currentImagePage++;
+      } else {
+        _currentImagePage = 0;
+      }
+
+      _imagePageController.animateToPage(
+        _currentImagePage,
+        duration: const Duration(milliseconds: 700),
         curve: Curves.easeInOut,
       );
     });
@@ -79,14 +109,15 @@ class _AdBannerState extends ConsumerState<AdBanner> {
 
   @override
   void dispose() {
-    _timer?.cancel();
-    _pageController.dispose();
+    _textTimer?.cancel();
+    _imageTimer?.cancel();
+    _textPageController.dispose();
+    _imagePageController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    debugPrint('Building AdBanner with Image: $_bannerImage');
     return Container(
       height: 120,
       width: double.infinity,
@@ -105,34 +136,42 @@ class _AdBannerState extends ConsumerState<AdBanner> {
         borderRadius: BorderRadius.circular(16),
         child: Stack(
           children: [
-            // Background Image with Error Handling
+            // Background Image Carousel
             Positioned.fill(
-              child: Image.network(
-                _bannerImage,
-                fit: BoxFit.cover,
-                alignment: Alignment.center,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return Container(
-                    color: Colors.grey.shade800,
-                    child: const Center(
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2,
-                      ),
-                    ),
-                  );
+              child: PageView.builder(
+                controller: _imagePageController,
+                itemCount: _bannerImages.length,
+                onPageChanged: (index) {
+                  setState(() => _currentImagePage = index);
                 },
-                errorBuilder: (context, error, stackTrace) {
-                  debugPrint('AdBanner Image Error: $error');
-                  return Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Color(0xFF2E3192), Color(0xFF1BFFFF)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                    ),
+                itemBuilder: (context, index) {
+                  return Image.network(
+                    _bannerImages[index],
+                    fit: BoxFit.cover,
+                    alignment: Alignment.center,
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return Container(
+                        color: Colors.grey.shade800,
+                        child: const Center(
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        ),
+                      );
+                    },
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Color(0xFF2E3192), Color(0xFF1BFFFF)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                        ),
+                      );
+                    },
                   );
                 },
               ),
@@ -145,11 +184,11 @@ class _AdBannerState extends ConsumerState<AdBanner> {
             ),
             // Scrolling Text Content
             PageView.builder(
-              controller: _pageController,
+              controller: _textPageController,
               itemCount: _ads.length,
               onPageChanged: (index) {
                 setState(() {
-                  _currentPage = index;
+                  _currentTextPage = index;
                 });
               },
               itemBuilder: (context, index) {

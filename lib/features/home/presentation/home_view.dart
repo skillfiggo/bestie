@@ -16,6 +16,8 @@ import 'package:bestie/features/auth/data/providers/auth_providers.dart';
 import 'package:bestie/features/chat/data/repositories/call_repository.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import 'package:bestie/features/admin/data/repositories/admin_repository.dart';
+
 class HomeView extends ConsumerStatefulWidget {
   const HomeView({super.key});
 
@@ -30,11 +32,91 @@ class _HomeViewState extends ConsumerState<HomeView> {
   bool _isLoading = true;
   String? _error;
   bool _isStartingCall = false; // Prevent duplicate call requests
+  
+  static final Set<String> _seenBroadcasts = {}; // Session-based seen tracking
 
   @override
   void initState() {
     super.initState();
     _loadProfiles();
+    _checkBroadcast();
+  }
+  
+  Future<void> _checkBroadcast() async {
+    // Small delay to let UI build first
+    await Future.delayed(const Duration(seconds: 1));
+    if (!mounted) return;
+
+    try {
+      final broadcast = await ref.read(adminRepositoryProvider).getLatestActiveBroadcast();
+      if (broadcast != null && !_seenBroadcasts.contains(broadcast.id)) {
+        if (mounted) {
+          _seenBroadcasts.add(broadcast.id);
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: Row(
+                children: [
+                   const Icon(Icons.campaign, color: AppColors.primary),
+                   const SizedBox(width: 8),
+                   Expanded(child: Text(broadcast.title)),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (broadcast.imageUrl != null && broadcast.imageUrl!.isNotEmpty) ...[
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          broadcast.imageUrl!, 
+                          fit: BoxFit.cover,
+                          errorBuilder: (c, e, s) => const SizedBox.shrink(), // Hide if load fails
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    Text(broadcast.message),
+                    if (broadcast.linkUrl != null && broadcast.linkUrl!.isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                             onPressed: () { 
+                                // TODO: Implement URL launching
+                                // launchUrl(Uri.parse(broadcast.linkUrl!));
+                                Navigator.pop(context);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Link tapped: ${broadcast.linkUrl}')),
+                                );
+                             },
+                             icon: const Icon(Icons.open_in_new, size: 16),
+                             label: Text(broadcast.linkText?.isNotEmpty == true ? broadcast.linkText! : 'Learn More'),
+                             style: ElevatedButton.styleFrom(
+                               backgroundColor: AppColors.primary,
+                               foregroundColor: Colors.white,
+                             ),
+                          ),
+                        ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Dismiss', style: TextStyle(color: Colors.grey)),
+                ),
+              ],
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('Failed to fetch broadcast: $e');
+    }
   }
 
   Future<void> _loadProfiles() async {

@@ -8,6 +8,8 @@ class ChatModel {
   final int unreadCount;
   final bool isOnline;
   final bool isOfficial;
+  final int streakCount;
+  final DateTime? lastStreakUpdate;
 
   const ChatModel({
     required this.id,
@@ -19,6 +21,8 @@ class ChatModel {
     this.unreadCount = 0,
     this.isOnline = false,
     this.isOfficial = false,
+    this.streakCount = 0,
+    this.lastStreakUpdate,
   });
 
   factory ChatModel.fromMap(Map<String, dynamic> map, String currentUserId, {int unreadCount = 0}) {
@@ -37,7 +41,11 @@ class ChatModel {
           : DateTime.fromMillisecondsSinceEpoch(0), // Fallback
       unreadCount: unreadCount,
       isOnline: otherUser?['is_online'] ?? false,
-      isOfficial: false, // You might want to flag specific IDs as official
+      isOfficial: false,
+      streakCount: map['streak_count'] ?? 0,
+      lastStreakUpdate: map['last_streak_update'] != null 
+          ? DateTime.parse(map['last_streak_update']) 
+          : null,
     );
   }
 }

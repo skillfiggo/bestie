@@ -169,6 +169,14 @@ class ChatRepository {
       'last_message_time': DateTime.now().toIso8601String(),
     }).eq('id', chatId);
   }
+
+  Future<void> _updateStreak(String chatId) async {
+    try {
+      await _client.rpc('update_chat_streak', params: {'target_chat_id': chatId});
+    } catch (e) {
+      print('Failed to update streak: $e');
+    }
+  }
   /// Create or get existing chat
   Future<ChatModel> createOrGetChat(String otherUserId) async {
     final userId = _client.auth.currentUser!.id;
@@ -211,12 +219,18 @@ class ChatRepository {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) return;
 
-    await _client
+    final response = await _client
         .from('messages')
         .update({'status': 'read'})
         .eq('chat_id', chatId)
         .eq('receiver_id', userId)
-        .neq('status', 'read');
+        .neq('status', 'read')
+        .select();
+
+    final updatedList = response as List<dynamic>;
+    if (updatedList.isNotEmpty) {
+      _updateStreak(chatId);
+    }
   }
   /// Clear all messages in a chat
   Future<void> clearChatMessages(String chatId) async {

@@ -1,3 +1,4 @@
+import 'package:bestie/features/admin/domain/models/broadcast_model.dart';
 import 'package:bestie/core/services/supabase_service.dart';
 import 'package:bestie/features/home/domain/models/profile_model.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -21,6 +22,22 @@ class AdminRepository {
       return data.map((e) => ProfileModel.fromMap(e)).toList();
     } catch (e) {
       throw Exception('Failed to fetch users: $e');
+    }
+  }
+
+  /// Search users by name or bestie_id
+  Future<List<ProfileModel>> searchUsers(String query) async {
+    try {
+      final response = await _client
+          .from('profiles')
+          .select()
+          .or('name.ilike.%$query%,bestie_id.ilike.%$query%')
+          .limit(50);
+
+      final data = response as List<dynamic>;
+      return data.map((e) => ProfileModel.fromMap(e)).toList();
+    } catch (e) {
+      throw Exception('Failed to search users: $e');
     }
   }
 
@@ -77,6 +94,85 @@ class AdminRepository {
       await _client.from('profiles').update({'verification_photo_url': ''}).eq('id', userId);
     } catch (e) {
       throw Exception('Failed to reject verification: $e');
+    }
+  }
+
+  /// Update user role
+  Future<void> updateUserRole(String userId, String newRole) async {
+    try {
+      await _client.from('profiles').update({'role': newRole}).eq('id', userId);
+    } catch (e) {
+      throw Exception('Failed to update user role: $e');
+    }
+  }
+
+  /// Create a new broadcast
+  Future<void> createBroadcast({
+    required String title,
+    required String message,
+    String? imageUrl,
+    String? linkUrl,
+    String? linkText,
+  }) async {
+    try {
+      final currentUserId = _client.auth.currentUser?.id;
+      if (currentUserId == null) throw Exception('Not authenticated');
+
+      await _client.from('broadcasts').insert({
+        'title': title,
+        'message': message,
+        'image_url': imageUrl,
+        'link_url': linkUrl,
+        'link_text': linkText,
+        'created_by': currentUserId,
+        'is_active': true,
+      });
+    } catch (e) {
+      throw Exception('Failed to create broadcast: $e');
+    }
+  }
+
+  /// Get all broadcasts (for admin)
+  Future<List<BroadcastModel>> getBroadcasts() async {
+    try {
+      final response = await _client
+          .from('broadcasts')
+          .select()
+          .order('created_at', ascending: false);
+      
+      final data = response as List<dynamic>;
+      return data.map((e) => BroadcastModel.fromMap(e)).toList();
+    } catch (e) {
+      throw Exception('Failed to fetch broadcasts: $e');
+    }
+  }
+
+  /// Get latest active broadcast (for users)
+  Future<BroadcastModel?> getLatestActiveBroadcast() async {
+    try {
+      final response = await _client
+          .from('broadcasts')
+          .select()
+          .eq('is_active', true)
+          .order('created_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+
+      if (response == null) return null;
+      return BroadcastModel.fromMap(response);
+    } catch (e) {
+      // Don't throw for users, just return null to avoid blocking app
+      print('Error fetching broadcast: $e');
+      return null;
+    }
+  }
+
+  /// Deactivate a broadcast
+  Future<void> deactivateBroadcast(String broadcastId) async {
+    try {
+      await _client.from('broadcasts').update({'is_active': false}).eq('id', broadcastId);
+    } catch (e) {
+      throw Exception('Failed to deactivate broadcast: $e');
     }
   }
 }
