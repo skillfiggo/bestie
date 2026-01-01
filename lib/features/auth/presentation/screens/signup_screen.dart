@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bestie/core/constants/app_colors.dart';
 import 'package:bestie/features/auth/presentation/screens/verification_screen.dart';
-import 'package:bestie/app/router.dart';
 import 'package:bestie/features/auth/data/providers/auth_providers.dart';
 import 'package:bestie/features/auth/presentation/widgets/signup_steps/gender_step.dart';
 import 'package:bestie/features/auth/presentation/widgets/signup_steps/female_profile_step.dart';
@@ -10,7 +9,6 @@ import 'package:bestie/features/auth/presentation/widgets/signup_steps/female_ve
 import 'package:bestie/features/auth/presentation/widgets/signup_steps/male_name_step.dart';
 import 'dart:io';
 import 'package:bestie/features/auth/presentation/widgets/signup_steps/male_credentials_step.dart';
-import 'package:bestie/features/common/data/repositories/storage_repository.dart';
 
 class SignupScreen extends ConsumerStatefulWidget {
   final VoidCallback onSwitchToLogin;
@@ -129,7 +127,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
              'verification_photo_url': url,
            });
          } catch (e) {
-           print('Verification upload failed: $e');
+           debugPrint('Verification upload failed: $e');
            // Don't block signup success
          }
        }

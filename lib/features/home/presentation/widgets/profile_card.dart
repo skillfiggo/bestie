@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:bestie/core/constants/app_colors.dart';
 import 'package:bestie/features/home/domain/models/profile_model.dart';
 import 'package:bestie/features/admin/presentation/widgets/report_dialog.dart';
 
@@ -34,7 +33,7 @@ class ProfileCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -80,7 +79,7 @@ class ProfileCard extends StatelessWidget {
                     child: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.4),
+                        color: Colors.black.withValues(alpha: 0.4),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
@@ -106,7 +105,7 @@ class ProfileCard extends StatelessWidget {
                         end: Alignment.bottomCenter,
                         colors: [
                           Colors.transparent,
-                          Colors.black.withOpacity(0.8),
+                          Colors.black.withValues(alpha: 0.8),
                         ],
                       ),
                     ),
@@ -266,7 +265,7 @@ class _ActionButton extends StatelessWidget {
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: color.withOpacity(0.4),
+              color: color.withValues(alpha: 0.4),
               blurRadius: 8,
               offset: const Offset(0, 4),
             ),

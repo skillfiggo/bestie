@@ -54,7 +54,7 @@ class MessageBubble extends StatelessWidget {
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
+                        color: Colors.black.withValues(alpha: 0.05),
                         blurRadius: 5,
                         offset: const Offset(0, 2),
                       ),
@@ -63,23 +63,7 @@ class MessageBubble extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (message.type == MessageType.voice)
-                        AudioPlayerWidget(
-                          url: message.mediaUrl ?? message.content, // Fallback to content if mediaUrl is null, though it should be populated
-                          isMe: isMe,
-                          initialDuration: message.duration,
-                        )
-                      else
-                        Text(
-                          message.content,
-                          style: TextStyle(
-                            color: isMe
-                                ? Colors.white
-                                : AppColors.textPrimary,
-                            fontSize: 15,
-                            height: 1.4,
-                          ),
-                        ),
+                      _buildMessageContent(),
                     ],
                   ),
                 ),
@@ -112,6 +96,81 @@ class MessageBubble extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildMessageContent() {
+    // 1. Voice Note
+    if (message.type == MessageType.voice) {
+      return AudioPlayerWidget(
+        url: message.mediaUrl ?? message.content,
+        isMe: isMe,
+        initialDuration: message.duration,
+      );
+    }
+    
+    // 2. Call Logs
+    final content = message.content;
+    // Check for standard call log patterns
+    final bool isCallStart = content.contains('Started a') && content.contains('call') && content.contains('[call_id:');
+    final bool isCallMissed = content.contains('Missed') && content.contains('call');
+    
+    if (isCallStart || isCallMissed) {
+       final isVideo = content.toLowerCase().contains('video');
+       
+       return Row(
+         mainAxisSize: MainAxisSize.min,
+         children: [
+           Container(
+             padding: const EdgeInsets.all(8),
+             decoration: BoxDecoration(
+               color: isMe ? Colors.white.withValues(alpha: 0.2) : Colors.black.withValues(alpha: 0.05),
+               shape: BoxShape.circle,
+             ),
+             child: Icon(
+               isCallMissed 
+                 ? (isVideo ? Icons.videocam_off_rounded : Icons.phone_missed_rounded)
+                 : (isVideo ? Icons.videocam_rounded : Icons.phone_rounded),
+               color: isMe ? Colors.white : AppColors.textPrimary,
+               size: 20,
+             ),
+           ),
+           const SizedBox(width: 12),
+           Column(
+             crossAxisAlignment: CrossAxisAlignment.start,
+             children: [
+               Text(
+                 isCallMissed 
+                   ? (isVideo ? 'Missed Video Call' : 'Missed Voice Call')
+                   : (isVideo ? 'Video Call' : 'Voice Call'),
+                 style: TextStyle(
+                   color: isMe ? Colors.white : AppColors.textPrimary,
+                   fontSize: 16,
+                   fontWeight: FontWeight.bold,
+                 ),
+               ),
+               if (isCallStart)
+                 Text(
+                   'Tap for details', // Placeholder or just hide ID
+                   style: TextStyle(
+                     color: isMe ? Colors.white70 : Colors.black54,
+                     fontSize: 10,
+                   ),
+                 ),
+             ],
+           ),
+         ],
+       );
+    }
+
+    // 3. Normal Text
+    return Text(
+      message.content,
+      style: TextStyle(
+        color: isMe ? Colors.white : AppColors.textPrimary,
+        fontSize: 15,
+        height: 1.4,
       ),
     );
   }

@@ -241,7 +241,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   child: Text(
                     'OR',
                     style: TextStyle(
-                      color: AppColors.textSecondary.withOpacity(0.7),
+                      color: AppColors.textSecondary.withValues(alpha: 0.7),
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -307,7 +307,7 @@ class _SocialLoginButton extends StatelessWidget {
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.textPrimary,
           side: BorderSide(
-            color: AppColors.textSecondary.withOpacity(0.3),
+            color: AppColors.textSecondary.withValues(alpha: 0.3),
             width: 1.5,
           ),
           shape: RoundedRectangleBorder(

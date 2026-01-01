@@ -10,10 +10,8 @@ final smsNotificationsProvider = StateProvider<bool>((ref) => false);
 // Message notifications
 final newMessageNotificationProvider = StateProvider<bool>((ref) => true);
 final messagePreviewProvider = StateProvider<bool>((ref) => true);
-final groupMessageNotificationProvider = StateProvider<bool>((ref) => true);
 
 // Social notifications
-final newMatchNotificationProvider = StateProvider<bool>((ref) => true);
 final profileVisitNotificationProvider = StateProvider<bool>((ref) => true);
 final likeNotificationProvider = StateProvider<bool>((ref) => true);
 final commentNotificationProvider = StateProvider<bool>((ref) => true);
@@ -27,7 +25,6 @@ final callVibrationProvider = StateProvider<bool>((ref) => true);
 // App notifications
 final appUpdatesNotificationProvider = StateProvider<bool>((ref) => true);
 final promotionsNotificationProvider = StateProvider<bool>((ref) => false);
-final tipsNotificationProvider = StateProvider<bool>((ref) => true);
 
 // Do Not Disturb
 final doNotDisturbProvider = StateProvider<bool>((ref) => false);
@@ -45,9 +42,7 @@ class NotificationSettingsScreen extends ConsumerWidget {
 
     final newMessage = ref.watch(newMessageNotificationProvider);
     final messagePreview = ref.watch(messagePreviewProvider);
-    final groupMessage = ref.watch(groupMessageNotificationProvider);
 
-    final newMatch = ref.watch(newMatchNotificationProvider);
     final profileVisit = ref.watch(profileVisitNotificationProvider);
     final like = ref.watch(likeNotificationProvider);
     final comment = ref.watch(commentNotificationProvider);
@@ -59,7 +54,6 @@ class NotificationSettingsScreen extends ConsumerWidget {
 
     final appUpdates = ref.watch(appUpdatesNotificationProvider);
     final promotions = ref.watch(promotionsNotificationProvider);
-    final tips = ref.watch(tipsNotificationProvider);
 
     final doNotDisturb = ref.watch(doNotDisturbProvider);
     final dndStartTime = ref.watch(dndStartTimeProvider);
@@ -136,27 +130,11 @@ class NotificationSettingsScreen extends ConsumerWidget {
             value: messagePreview,
             onChanged: (value) => ref.read(messagePreviewProvider.notifier).state = value,
           ),
-          _buildSwitchTile(
-            context,
-            icon: Icons.group_outlined,
-            iconColor: Colors.teal,
-            title: 'Group Messages',
-            subtitle: 'Notifications for group conversations',
-            value: groupMessage,
-            onChanged: (value) => ref.read(groupMessageNotificationProvider.notifier).state = value,
-          ),
+
 
           const SizedBox(height: 24),
           _buildSectionHeader('Social Activity'),
-          _buildSwitchTile(
-            context,
-            icon: Icons.favorite_outline,
-            iconColor: Colors.pink,
-            title: 'New Matches',
-            subtitle: 'When someone matches with you',
-            value: newMatch,
-            onChanged: (value) => ref.read(newMatchNotificationProvider.notifier).state = value,
-          ),
+
           _buildSwitchTile(
             context,
             icon: Icons.visibility_outlined,
@@ -224,35 +202,8 @@ class NotificationSettingsScreen extends ConsumerWidget {
             onChanged: (value) => ref.read(callVibrationProvider.notifier).state = value,
           ),
 
-          const SizedBox(height: 24),
-          _buildSectionHeader('App Updates & News'),
-          _buildSwitchTile(
-            context,
-            icon: Icons.system_update_outlined,
-            iconColor: Colors.blue,
-            title: 'App Updates',
-            subtitle: 'New features and improvements',
-            value: appUpdates,
-            onChanged: (value) => ref.read(appUpdatesNotificationProvider.notifier).state = value,
-          ),
-          _buildSwitchTile(
-            context,
-            icon: Icons.local_offer_outlined,
-            iconColor: Colors.orange,
-            title: 'Promotions & Offers',
-            subtitle: 'Special deals and discounts',
-            value: promotions,
-            onChanged: (value) => ref.read(promotionsNotificationProvider.notifier).state = value,
-          ),
-          _buildSwitchTile(
-            context,
-            icon: Icons.lightbulb_outline,
-            iconColor: Colors.amber,
-            title: 'Tips & Tricks',
-            subtitle: 'Get the most out of the app',
-            value: tips,
-            onChanged: (value) => ref.read(tipsNotificationProvider.notifier).state = value,
-          ),
+
+
 
           const SizedBox(height: 24),
           _buildSectionHeader('Do Not Disturb'),
@@ -321,7 +272,7 @@ class NotificationSettingsScreen extends ConsumerWidget {
       leading: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: iconColor.withOpacity(0.1),
+          color: iconColor.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Icon(icon, color: iconColor, size: 22),
@@ -344,7 +295,7 @@ class NotificationSettingsScreen extends ConsumerWidget {
       trailing: Switch(
         value: value,
         onChanged: onChanged,
-        activeColor: AppColors.primary,
+        activeThumbColor: AppColors.primary,
       ),
     );
   }
@@ -363,7 +314,7 @@ class NotificationSettingsScreen extends ConsumerWidget {
       leading: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: iconColor.withOpacity(0.1),
+          color: iconColor.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Icon(icon, color: iconColor, size: 22),

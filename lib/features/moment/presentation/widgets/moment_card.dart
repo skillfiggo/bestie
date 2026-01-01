@@ -4,7 +4,6 @@ import 'package:bestie/core/constants/app_colors.dart';
 import 'package:bestie/features/moment/domain/models/moment.dart';
 import 'package:bestie/features/moment/data/providers/moment_providers.dart';
 import 'package:bestie/features/moment/presentation/widgets/comments_sheet.dart';
-import 'package:bestie/features/chat/data/repositories/chat_repository.dart';
 import 'package:bestie/features/chat/data/providers/chat_providers.dart';
 import 'package:bestie/features/chat/presentation/screens/chat_detail_screen.dart';
 
@@ -52,7 +51,7 @@ class MomentCard extends ConsumerWidget {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -141,7 +140,7 @@ class MomentCard extends ConsumerWidget {
                 },
                 icon: const Icon(Icons.chat_bubble_outline_rounded, color: AppColors.primary),
                 style: IconButton.styleFrom(
-                  backgroundColor: AppColors.primary.withOpacity(0.1),
+                  backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                   padding: const EdgeInsets.all(10),
                 ),
               ),

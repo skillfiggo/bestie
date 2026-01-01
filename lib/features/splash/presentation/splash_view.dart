@@ -95,7 +95,7 @@ class _SplashViewState extends State<SplashView> with SingleTickerProviderStateM
                             borderRadius: BorderRadius.circular(30),
                             boxShadow: [
                               BoxShadow(
-                                color: AppColors.limeSoft.withOpacity(0.5),
+                                color: AppColors.limeSoft.withValues(alpha: 0.5),
                                 blurRadius: 30,
                                 spreadRadius: 10,
                               ),
@@ -113,7 +113,7 @@ class _SplashViewState extends State<SplashView> with SingleTickerProviderStateM
                         
                         // App name
                         const Text(
-                          'BESTIE',
+                          'BESTIEE',
                           style: TextStyle(
                             fontSize: 48,
                             fontWeight: FontWeight.bold,

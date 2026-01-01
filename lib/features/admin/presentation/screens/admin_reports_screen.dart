@@ -145,7 +145,7 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Icon(icon, color: color, size: 24),
@@ -434,7 +434,7 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
                       Text(
                         _selectedFilter == 'all' 
                             ? 'All clear! No reports to review.'
-                            : 'No ${_selectedFilter} reports.',
+                            : 'No $_selectedFilter reports.',
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.grey.shade500,
@@ -514,7 +514,7 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.1),
+                      color: statusColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(

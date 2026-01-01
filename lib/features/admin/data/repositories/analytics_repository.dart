@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:bestie/core/services/supabase_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -13,7 +14,7 @@ class AnalyticsRepository {
       final response = await _client.from('profiles').select();
       return (response as List).length;
     } catch (e) {
-      print('Error fetching total users: $e');
+      debugPrint('Error fetching total users: $e');
       return 0;
     }
   }
@@ -27,7 +28,7 @@ class AnalyticsRepository {
           .eq('is_online', true);
       return (response as List).length;
     } catch (e) {
-      print('Error fetching active users: $e');
+      debugPrint('Error fetching active users: $e');
       return 0;
     }
   }
@@ -41,7 +42,7 @@ class AnalyticsRepository {
           .eq('is_verified', true);
       return (response as List).length;
     } catch (e) {
-      print('Error fetching verified users: $e');
+      debugPrint('Error fetching verified users: $e');
       return 0;
     }
   }
@@ -55,7 +56,7 @@ class AnalyticsRepository {
           .eq('status', 'banned');
       return (response as List).length;
     } catch (e) {
-      print('Error fetching banned users: $e');
+      debugPrint('Error fetching banned users: $e');
       return 0;
     }
   }
@@ -72,7 +73,7 @@ class AnalyticsRepository {
           .gte('created_at', startOfDay.toIso8601String());
       return (response as List).length;
     } catch (e) {
-      print('Error fetching new users today: $e');
+      debugPrint('Error fetching new users today: $e');
       return 0;
     }
   }
@@ -90,7 +91,7 @@ class AnalyticsRepository {
           .gte('created_at', startOfWeekMidnight.toIso8601String());
       return (response as List).length;
     } catch (e) {
-      print('Error fetching new users this week: $e');
+      debugPrint('Error fetching new users this week: $e');
       return 0;
     }
   }
@@ -107,7 +108,7 @@ class AnalyticsRepository {
           .gte('created_at', startOfMonth.toIso8601String());
       return (response as List).length;
     } catch (e) {
-      print('Error fetching new users this month: $e');
+      debugPrint('Error fetching new users this month: $e');
       return 0;
     }
   }
@@ -118,7 +119,7 @@ class AnalyticsRepository {
       final response = await _client.from('messages').select();
       return (response as List).length;
     } catch (e) {
-      print('Error fetching total messages: $e');
+      debugPrint('Error fetching total messages: $e');
       return 0;
     }
   }
@@ -129,7 +130,7 @@ class AnalyticsRepository {
       final response = await _client.from('chats').select();
       return (response as List).length;
     } catch (e) {
-      print('Error fetching total chats: $e');
+      debugPrint('Error fetching total chats: $e');
       return 0;
     }
   }
@@ -140,7 +141,7 @@ class AnalyticsRepository {
       final response = await _client.from('call_history').select();
       return (response as List).length;
     } catch (e) {
-      print('Error fetching total calls: $e');
+      debugPrint('Error fetching total calls: $e');
       return 0;
     }
   }
@@ -155,7 +156,7 @@ class AnalyticsRepository {
           .eq('is_verified', false);
       return (response as List).length;
     } catch (e) {
-      print('Error fetching pending verifications: $e');
+      debugPrint('Error fetching pending verifications: $e');
       return 0;
     }
   }
@@ -185,7 +186,7 @@ class AnalyticsRepository {
 
       return growthData;
     } catch (e) {
-      print('Error fetching user growth data: $e');
+      debugPrint('Error fetching user growth data: $e');
       return [];
     }
   }
@@ -211,7 +212,7 @@ class AnalyticsRepository {
 
       return distribution;
     } catch (e) {
-      print('Error fetching gender distribution: $e');
+      debugPrint('Error fetching gender distribution: $e');
       return {'male': 0, 'female': 0, 'other': 0};
     }
   }

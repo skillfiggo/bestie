@@ -4,7 +4,6 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bestie/core/constants/app_colors.dart';
 import 'package:bestie/features/auth/data/providers/auth_providers.dart';
-import 'package:bestie/features/chat/data/repositories/chat_repository.dart';
 import 'package:bestie/features/chat/data/providers/chat_providers.dart';
 import 'package:bestie/features/chat/presentation/screens/chat_detail_screen.dart';
 import 'package:bestie/features/calling/presentation/screens/call_screen.dart';

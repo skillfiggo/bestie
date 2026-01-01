@@ -45,8 +45,8 @@ class _AdBannerState extends ConsumerState<AdBanner> {
         repo.fetchBannerImages(),
       ]);
 
-      final dynamicAds = results[0] as List<String>;
-      final dynamicImages = results[1] as List<String>;
+      final dynamicAds = results[0];
+      final dynamicImages = results[1];
 
       if (mounted) {
         setState(() {
@@ -126,7 +126,7 @@ class _AdBannerState extends ConsumerState<AdBanner> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -179,7 +179,7 @@ class _AdBannerState extends ConsumerState<AdBanner> {
             // Dark Overlay for Text Readability
             Positioned.fill(
               child: Container(
-                color: Colors.black.withOpacity(0.4),
+                color: Colors.black.withValues(alpha: 0.4),
               ),
             ),
             // Scrolling Text Content

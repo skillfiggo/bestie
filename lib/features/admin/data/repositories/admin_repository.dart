@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:bestie/features/admin/domain/models/broadcast_model.dart';
 import 'package:bestie/core/services/supabase_service.dart';
 import 'package:bestie/features/home/domain/models/profile_model.dart';
@@ -162,7 +163,7 @@ class AdminRepository {
       return BroadcastModel.fromMap(response);
     } catch (e) {
       // Don't throw for users, just return null to avoid blocking app
-      print('Error fetching broadcast: $e');
+      debugPrint('Error fetching broadcast: $e');
       return null;
     }
   }

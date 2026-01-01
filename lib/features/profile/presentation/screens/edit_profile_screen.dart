@@ -38,7 +38,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   
   // Gallery State
   List<String> _currentGalleryUrls = [];
-  List<File> _newGalleryImages = [];
+  final List<File> _newGalleryImages = [];
   
   bool _isLoading = false;
 
@@ -148,8 +148,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         'looking_for': _selectedLookingFor,
         'age': int.tryParse(_ageController.text) ?? widget.initialProfile.age,
         'gallery_urls': finalGalleryUrls,
-        if (avatarUrl != null) 'avatar_url': avatarUrl,
-        if (coverUrl != null) 'cover_photo_url': coverUrl,
+        'avatar_url': avatarUrl,
+        'cover_photo_url': coverUrl,
       });
 
       if (mounted) {

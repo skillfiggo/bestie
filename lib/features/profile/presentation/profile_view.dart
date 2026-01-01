@@ -32,7 +32,7 @@ class ProfileView extends ConsumerWidget {
           headerSliverBuilder: (context, innerBoxIsScrolled) {
             return [
               SliverAppBar(
-                expandedHeight: 520, // Increased height to prevent overlap
+                expandedHeight: 600, // Increased height for Check-in card
                 pinned: true,
                 backgroundColor: Colors.white,
                 elevation: 0,
@@ -341,6 +341,8 @@ class ProfileView extends ConsumerWidget {
                                   ],
                                 ),
                                 const SizedBox(height: 16),
+                                // Daily Check-in
+                                _buildCheckInCard(context, ref, profile),
                                 // Wallet Row
                                 Row(
                                   children: [
@@ -362,7 +364,7 @@ class ProfileView extends ConsumerWidget {
                                               end: Alignment.bottomRight,
                                               colors: [
                                                 Colors.orange.shade50,
-                                                Colors.orange.shade100.withOpacity(0.5),
+                                                Colors.orange.shade100.withValues(alpha: 0.5),
                                               ],
                                             ),
                                             borderRadius: BorderRadius.circular(20),
@@ -373,7 +375,7 @@ class ProfileView extends ConsumerWidget {
                                               Container(
                                                 padding: const EdgeInsets.all(10),
                                                 decoration: BoxDecoration(
-                                                  color: Colors.orange.withOpacity(0.1),
+                                                  color: Colors.orange.withValues(alpha: 0.1),
                                                   shape: BoxShape.circle,
                                                 ),
                                                 child: const Icon(Icons.monetization_on_rounded, color: Colors.orange, size: 24),
@@ -424,7 +426,7 @@ class ProfileView extends ConsumerWidget {
                                               end: Alignment.bottomRight,
                                               colors: [
                                                 Colors.blue.shade50,
-                                                Colors.blue.shade100.withOpacity(0.5),
+                                                Colors.blue.shade100.withValues(alpha: 0.5),
                                               ],
                                             ),
                                             borderRadius: BorderRadius.circular(20),
@@ -435,7 +437,7 @@ class ProfileView extends ConsumerWidget {
                                               Container(
                                                 padding: const EdgeInsets.all(10),
                                                 decoration: BoxDecoration(
-                                                  color: Colors.blue.withOpacity(0.1),
+                                                  color: Colors.blue.withValues(alpha: 0.1),
                                                   shape: BoxShape.circle,
                                                 ),
                                                 child: const Icon(Icons.diamond_rounded, color: Colors.blue, size: 24),
@@ -661,35 +663,6 @@ class ProfileView extends ConsumerWidget {
      );
   }
 
-  Widget _buildWalletItem(IconData icon, String label, String value, Color color) {
-    return Row(
-      children: [
-        Icon(icon, color: color, size: 24),
-        const SizedBox(width: 8),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              value,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey.shade600,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
   Widget _buildInterestChip(String label) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -706,5 +679,95 @@ class ProfileView extends ConsumerWidget {
         ),
       ),
     );
+  }
+  Widget _buildCheckInCard(BuildContext context, WidgetRef ref, dynamic profile) {
+     final bool checkedIn = _isCheckedInToday(profile.lastCheckIn);
+     
+     return Container(
+       margin: const EdgeInsets.only(bottom: 12),
+       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+       decoration: BoxDecoration(
+         gradient: LinearGradient(
+           colors: [Colors.purple.shade50, Colors.purple.shade100.withValues(alpha: 0.5)],
+         ),
+         borderRadius: BorderRadius.circular(16),
+         border: Border.all(color: Colors.purple.shade100),
+       ),
+       child: Row(
+         children: [
+           Container(
+             padding: const EdgeInsets.all(8),
+             decoration: BoxDecoration(
+               color: Colors.purple.withValues(alpha: 0.1),
+               shape: BoxShape.circle,
+             ),
+             child: const Icon(Icons.calendar_today_rounded, color: Colors.purple, size: 20),
+           ),
+           const SizedBox(width: 12),
+           Expanded(
+             child: Column(
+               crossAxisAlignment: CrossAxisAlignment.start,
+               children: [
+                 const Text(
+                   'Daily Check-in', 
+                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.textPrimary)
+                 ),
+                 Text(
+                   checkedIn 
+                     ? 'You have ${profile.freeMessagesCount} free messages'
+                     : 'Get 5 free messages now!',
+                   style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                 ),
+               ],
+             ),
+           ),
+           ElevatedButton(
+             onPressed: checkedIn ? null : () async {
+               try {
+                  final success = await ref.read(authRepositoryProvider).dailyCheckIn(profile.id);
+                  if (success) {
+                    // Invalidate provider to refresh data
+                    ref.refresh(userProfileProvider); 
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('🎉 +5 Free Messages claimed!')),
+                      );
+                    }
+                  } else {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Already checked in today!')),
+                      );
+                    }
+                  }
+               } catch (e) {
+                 if (context.mounted) {
+                   ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Check-in failed: $e')),
+                   );
+                 }
+               }
+             },
+             style: ElevatedButton.styleFrom(
+               backgroundColor: checkedIn ? Colors.grey.shade300 : AppColors.primary,
+               foregroundColor: checkedIn ? Colors.grey : Colors.white,
+               elevation: 0,
+               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+             ),
+             child: Text(checkedIn ? 'Done' : 'Claim'),
+           ),
+         ],
+       ),
+     );
+  }
+
+  bool _isCheckedInToday(DateTime? lastCheckIn) {
+      if (lastCheckIn == null) return false;
+      final now = DateTime.now().toUtc();
+      final last = lastCheckIn.toUtc();
+      return last.year == now.year && 
+             last.month == now.month && 
+             last.day == now.day;
   }
 }

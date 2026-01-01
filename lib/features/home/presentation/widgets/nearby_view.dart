@@ -220,7 +220,7 @@ class _NearbyViewState extends State<NearbyView> {
   }) async {
     // Prevent duplicate calls
     if (_isStartingCall) {
-      print('⚠️ Already starting a call, ignoring duplicate request');
+      debugPrint('⚠️ Already starting a call, ignoring duplicate request');
       return;
     }
 
@@ -270,7 +270,7 @@ class _NearbyViewState extends State<NearbyView> {
       if (currentUserId == null) throw Exception('User not logged in');
 
       // Create call session
-      print('📞 Creating call session...');
+      debugPrint('📞 Creating call session...');
       // We need to access CallRepository. Since we are not in a Riverpod consumer widget here (it's StatefulWidget),
       // we can instantiate CallRepository directly or pass ref if we convert to ConsumerStatefulWidget.
       // But NearbyView IS NOT a ConsumerWidget currently.
@@ -282,7 +282,7 @@ class _NearbyViewState extends State<NearbyView> {
         receiverId: profileId,
         mediaType: isVideo ? 'video' : 'voice',
       );
-      print('✅ Call session created: $callHistoryId');
+      debugPrint('✅ Call session created: $callHistoryId');
 
       if (mounted) {
         Navigator.push(
@@ -299,7 +299,7 @@ class _NearbyViewState extends State<NearbyView> {
         );
       }
     } catch (e) {
-      print('❌ Error starting call: $e');
+      debugPrint('❌ Error starting call: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to start call: $e')),

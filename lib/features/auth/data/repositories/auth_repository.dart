@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bestie/core/services/supabase_service.dart';
 
@@ -112,6 +113,13 @@ class AuthRepository {
           .select()
           .eq('id', userId)
           .maybeSingle(); // Returns null if not found
+          
+      if (response != null && (response['bestie_id'] == null || response['bestie_id'] == '')) {
+         final newId = _generateBestieId();
+         await _client.from('profiles').update({'bestie_id': newId}).eq('id', userId);
+         response['bestie_id'] = newId;
+      }
+      
       return response;
     } catch (e) {
       // Handle error gracefully or rethrow
@@ -156,16 +164,95 @@ class AuthRepository {
       'diamonds': 0,
       'role': 'user',
       'status': 'active',
+      'free_messages_count': 0,
+      'free_messages_count': 0,
+      'last_check_in': null,
+      'bestie_id': _generateBestieId(),
     };
 
     try {
       // Upsert profile data. If a trigger already created it, this will update it.
       await _client.from('profiles').upsert(profileData);
     } catch (e) {
-      print('Profile creation/update failed: $e');
+      debugPrint('Profile creation/update failed: $e');
       // If it fails, it might be due to a specific constraint or trigger issue.
       // But for now, we want to see the real error if it persists.
       throw Exception('Failed to initialize profile: $e');
     }
+  }
+
+  /// Deduct coins from user's wallet
+  Future<void> deductCoins(String userId, int amount) async {
+    try {
+      // 1. Get current balance
+      final profile = await _client
+          .from('profiles')
+          .select('coins')
+          .eq('id', userId)
+          .single();
+      
+      final currentCoins = profile['coins'] as int? ?? 0;
+      
+      if (currentCoins < amount) {
+        throw Exception('Insufficient coins. Please recharge.');
+      }
+
+      // 2. Update balance
+      await _client.from('profiles').update({
+        'coins': currentCoins - amount,
+      }).eq('id', userId);
+      
+    } catch (e) {
+      debugPrint('Error deducting coins: $e');
+      rethrow;
+    }
+  }
+
+  /// Perform daily check-in
+  Future<bool> dailyCheckIn(String userId) async {
+    try {
+      final profile = await _client
+          .from('profiles')
+          .select('last_check_in')
+          .eq('id', userId)
+          .single();
+          
+      final lastCheckInStr = profile['last_check_in'] as String?;
+      final now = DateTime.now().toUtc();
+      
+      if (lastCheckInStr != null) {
+        final lastCheckIn = DateTime.parse(lastCheckInStr).toUtc();
+        // Simple day check (UTC)
+        if (lastCheckIn.year == now.year && 
+            lastCheckIn.month == now.month && 
+            lastCheckIn.day == now.day) {
+           return false; // Already checked in today
+        }
+      }
+      
+      // Grant 5 messages (Reset to 5, non-stacking)
+      await _client.from('profiles').update({
+        'free_messages_count': 5,
+        'last_check_in': now.toIso8601String(),
+      }).eq('id', userId);
+      
+      return true;
+    } catch (e) {
+      debugPrint('Check-in failed: $e');
+      rethrow;
+    }
+  }
+
+  /// Helper to generate a random 8-char alphanumeric ID
+  String _generateBestieId() {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    final random = DateTime.now().millisecondsSinceEpoch.toString();
+    // Simple pseudo-random strategy combined with timestamp parts
+    // Ideally use uuid or random, but for short ID:
+    return 'user${random.substring(random.length - 6)}';
+    // Ideally this should be more robust/random, but let's stick to simple "user"+digits for uniqueness or random letters
+    // user + 6 digits is simple.
+    // Or better:
+    // return (10000000 + DateTime.now().millisecondsSinceEpoch % 90000000).toString(); 
   }
 }

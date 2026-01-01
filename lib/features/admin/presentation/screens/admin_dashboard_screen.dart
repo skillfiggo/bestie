@@ -211,7 +211,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                   trailing: user.id != ref.read(authRepositoryProvider).getCurrentUser()?.id
                       ? Switch(
                           value: user.status == 'active',
-                          activeColor: Colors.green,
+                          activeThumbColor: Colors.green,
                           inactiveThumbColor: Colors.red,
                           inactiveTrackColor: Colors.red.shade100,
                           onChanged: (_) => _toggleBanStatus(user),

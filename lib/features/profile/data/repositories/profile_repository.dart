@@ -43,10 +43,29 @@ class ProfileRepository {
       query = query.lte('age', maxAge);
     }
 
-    // Sort by verified first
+    // Sort by verified first for discovery
     query = query.order('is_verified', ascending: false);
     
     // Applying limit
+    query = query.limit(limit);
+
+    final response = await query;
+    final data = response as List<dynamic>;
+
+    return data.map((e) => ProfileModel.fromMap(e)).toList();
+  }
+
+  /// Fetch newly registered users (Newcomers)
+  Future<List<ProfileModel>> getNewcomerProfiles({int limit = 20}) async {
+    final currentUser = _client.auth.currentUser;
+    if (currentUser == null) return [];
+
+    dynamic query = _client.from('profiles').select();
+    query = query.neq('id', currentUser.id);
+    query = query.neq('name', 'Official Team');
+    
+    // Sort by creation date (newest first)
+    query = query.order('created_at', ascending: false);
     query = query.limit(limit);
 
     final response = await query;
@@ -62,6 +81,22 @@ class ProfileRepository {
           .from('profiles')
           .select()
           .eq('id', userId)
+          .maybeSingle();
+
+      if (response == null) return null;
+      return ProfileModel.fromMap(response);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Fetch a single profile by Bestie ID (Safe short ID)
+  Future<ProfileModel?> getProfileByBestieId(String bestieId) async {
+    try {
+      final response = await _client
+          .from('profiles')
+          .select()
+          .ilike('bestie_id', bestieId.trim()) // Case-insensitive search
           .maybeSingle();
 
       if (response == null) return null;
@@ -86,7 +121,7 @@ class ProfileRepository {
   /// Upload profile or cover image
   Future<String> uploadProfileImage(String userId, File imageFile, {required bool isCover}) async {
     try {
-      final fileName = '${userId}/${isCover ? "cover" : "avatar"}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final fileName = '$userId/${isCover ? "cover" : "avatar"}_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final path = '$userId/$fileName';
 
       await _client.storage.from('avatars').upload(
@@ -104,7 +139,7 @@ class ProfileRepository {
 
   Future<String> uploadGalleryImage(String userId, File imageFile) async {
     try {
-      final fileName = '${userId}/gallery_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final fileName = '$userId/gallery_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final path = '$userId/$fileName';
 
       await _client.storage.from('avatars').upload(

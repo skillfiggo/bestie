@@ -272,7 +272,7 @@ class _AdminUserManagementScreenState extends ConsumerState<AdminUserManagementS
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: Colors.amber.withOpacity(0.2),
+                  color: Colors.amber.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: const Text('ADMIN', style: TextStyle(color: Colors.amber, fontSize: 10, fontWeight: FontWeight.bold)),
@@ -282,7 +282,7 @@ class _AdminUserManagementScreenState extends ConsumerState<AdminUserManagementS
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.2),
+                  color: Colors.blue.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: const Text('MOD', style: TextStyle(color: Colors.blue, fontSize: 10, fontWeight: FontWeight.bold)),
@@ -297,7 +297,7 @@ class _AdminUserManagementScreenState extends ConsumerState<AdminUserManagementS
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
+                  color: Colors.red.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: const Text('BANNED', style: TextStyle(color: Colors.red, fontSize: 10, fontWeight: FontWeight.bold)),
@@ -332,9 +332,9 @@ class _AdminUserManagementScreenState extends ConsumerState<AdminUserManagementS
                   ),
                   Switch(
                     value: user.status != 'banned',
-                    activeColor: Colors.green,
+                    activeThumbColor: Colors.green,
                     inactiveThumbColor: Colors.red,
-                    inactiveTrackColor: Colors.red.withOpacity(0.3),
+                    inactiveTrackColor: Colors.red.withValues(alpha: 0.3),
                     onChanged: (_) => _toggleBanStatus(user),
                   ),
                 ],

@@ -40,8 +40,8 @@ class _AdminBannerEditorScreenState extends ConsumerState<AdminBannerEditorScree
         repo.fetchBannerImages(),
       ]);
 
-      final ads = results[0] as List<String>;
-      final images = results[1] as List<String>;
+      final ads = results[0];
+      final images = results[1];
 
       setState(() {
         _ads = ads.isNotEmpty ? ads : [

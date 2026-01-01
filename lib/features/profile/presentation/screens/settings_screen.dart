@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:bestie/core/constants/app_colors.dart';
-import 'package:bestie/features/auth/data/repositories/auth_repository.dart';
 import 'package:bestie/features/auth/data/providers/auth_providers.dart';
 import 'package:bestie/app/router.dart';
 import 'package:bestie/features/profile/presentation/screens/edit_profile_screen.dart';
@@ -11,6 +11,74 @@ import 'package:bestie/features/admin/presentation/screens/admin_dashboard_scree
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
+
+  Future<void> _handleClearCache(BuildContext context) async {
+    // Show confirmation dialog
+    final shouldClear = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear Cache'),
+        content: const Text(
+          'This will clear cached images, files, and temporary data. Your messages and profile will not be affected.',
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+            child: const Text('Clear Cache', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldClear == true && context.mounted) {
+      try {
+        // Show loading indicator
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(
+            child: CircularProgressIndicator(),
+          ),
+        );
+
+        // Clear cache using path_provider
+        final cacheDir = await getTemporaryDirectory();
+        if (cacheDir.existsSync()) {
+          await cacheDir.delete(recursive: true);
+        }
+
+        if (context.mounted) {
+          Navigator.pop(context); // Close loading dialog
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Cache cleared successfully!'),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          Navigator.pop(context); // Close loading dialog
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error clearing cache: $e'),
+              backgroundColor: AppColors.error,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    }
+  }
 
   Future<void> _handleLogout(BuildContext context, WidgetRef ref) async {
     // Show confirmation dialog
@@ -197,12 +265,7 @@ class SettingsScreen extends ConsumerWidget {
 
           _buildSectionHeader('Account Settings'),
 
-          _buildSettingsTile(
-            context,
-            icon: Icons.lock_outline_rounded,
-            title: 'Security',
-            color: Colors.green,
-          ),
+
           _buildSettingsTile(
             context,
             icon: Icons.notifications_none_rounded,
@@ -251,6 +314,13 @@ class SettingsScreen extends ConsumerWidget {
               style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
             ),
           ),
+          _buildSettingsTile(
+            context,
+            icon: Icons.cleaning_services_rounded,
+            title: 'Clear Cache',
+            color: Colors.blueGrey,
+            onTap: () => _handleClearCache(context),
+          ),
 
           const SizedBox(height: 40),
           Padding(
@@ -258,7 +328,7 @@ class SettingsScreen extends ConsumerWidget {
             child: ElevatedButton(
               onPressed: () => _handleLogout(context, ref),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.error.withOpacity(0.1),
+                backgroundColor: AppColors.error.withValues(alpha: 0.1),
                 foregroundColor: AppColors.error,
                 elevation: 0,
                 padding: const EdgeInsets.symmetric(vertical: 16),
@@ -317,7 +387,7 @@ class SettingsScreen extends ConsumerWidget {
       leading: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
           // Using a slightly different approach to match the screenshot more closely if needed,
           // but sticking to the original code's style for consistency.

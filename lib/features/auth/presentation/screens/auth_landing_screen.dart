@@ -19,7 +19,7 @@ class AuthLandingScreen extends StatelessWidget {
               width: 400,
               height: 400,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.1),
+                color: Colors.white.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
             ),
@@ -31,7 +31,7 @@ class AuthLandingScreen extends StatelessWidget {
               width: 300,
               height: 300,
               decoration: BoxDecoration(
-                color: AppColors.lime.withOpacity(0.2),
+                color: AppColors.lime.withValues(alpha: 0.2),
                 shape: BoxShape.circle,
               ),
             ),
@@ -171,7 +171,7 @@ class AuthLandingScreen extends StatelessWidget {
                           textAlign: TextAlign.center,
                           text: TextSpan(
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.7),
+                              color: Colors.white.withValues(alpha: 0.7),
                               fontSize: 12,
                             ),
                             children: const [
@@ -204,7 +204,7 @@ class AuthLandingScreen extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.1),
+                color: Colors.black.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -314,54 +314,4 @@ class _SocialCircleButton extends StatelessWidget {
   }
 }
 
-class _MascotPlaceholder extends StatelessWidget {
-  final Color color;
-  final double size;
-  final double angle;
 
-  const _MascotPlaceholder({
-    required this.color,
-    required this.size,
-    required this.angle,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Transform.rotate(
-      angle: angle,
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(size / 3),
-        ),
-        // Simple face for effect
-        child: Center(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _Eye(),
-              const SizedBox(width: 10),
-              _Eye(),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _Eye extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 12,
-      height: 12,
-      decoration: const BoxDecoration(
-        color: Colors.black,
-        shape: BoxShape.circle,
-      ),
-    );
-  }
-}

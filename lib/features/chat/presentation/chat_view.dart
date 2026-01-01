@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:bestie/core/constants/app_colors.dart';
-import 'package:bestie/features/chat/domain/models/chat_model.dart';
 import 'package:bestie/features/home/presentation/widgets/ad_banner.dart';
 import 'package:bestie/features/chat/presentation/screens/chat_detail_screen.dart';
 import 'package:bestie/features/chat/domain/models/call_history_model.dart';

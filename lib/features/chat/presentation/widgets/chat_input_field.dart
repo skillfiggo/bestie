@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:bestie/core/constants/app_colors.dart';
-
+import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:record/record.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import 'dart:async';
+import 'package:flutter/foundation.dart' as foundation;
 
 class ChatInputField extends StatefulWidget {
   final Function(String) onSendMessage;
@@ -29,15 +30,16 @@ class ChatInputField extends StatefulWidget {
 
 class _ChatInputFieldState extends State<ChatInputField> {
   final TextEditingController _controller = TextEditingController();
+  final FocusNode _focusNode = FocusNode();
   final AudioRecorder _audioRecorder = AudioRecorder();
   
   bool _hasText = false;
   bool _isRecording = false;
   bool _isCancelled = false;
+  bool _showEmoji = false;
   Timer? _timer;
   int _recordDuration = 0;
-  String? _recordedPath;
-  double _cancelThreshold = 50.0; // Distance to drag to cancel
+  final double _cancelThreshold = 50.0;
 
   @override
   void initState() {
@@ -47,13 +49,32 @@ class _ChatInputFieldState extends State<ChatInputField> {
         _hasText = _controller.text.trim().isNotEmpty;
       });
     });
+    
+    _focusNode.addListener(() {
+      if (_focusNode.hasFocus) {
+        setState(() {
+          _showEmoji = false;
+        });
+      }
+    });
+  }
+
+  void _toggleEmojiKeyboard() {
+    if (_showEmoji) {
+      // Show keyboard
+      setState(() => _showEmoji = false);
+      _focusNode.requestFocus();
+    } else {
+      // Show emoji picker
+      FocusScope.of(context).unfocus();
+      setState(() => _showEmoji = true);
+    }
   }
 
   DateTime? _startTime;
 
   Future<void> _startRecording() async {
     try {
-      // 1. Check/Request Permission Explicitly
       if (!await _audioRecorder.hasPermission()) {
         final status = await Permission.microphone.request();
         if (status != PermissionStatus.granted) {
@@ -67,23 +88,20 @@ class _ChatInputFieldState extends State<ChatInputField> {
       final directory = await getTemporaryDirectory();
       final path = '${directory.path}/voice_note_${DateTime.now().millisecondsSinceEpoch}.m4a';
       
-      // 2. Configure for compatibility (AAC Low Complexity)
       const config = RecordConfig(
-        encoder: AudioEncoder.aacLc, // Safer cross-platform default
+        encoder: AudioEncoder.aacLc,
         bitRate: 128000,
         sampleRate: 44100,
       );
 
-      // 3. Start
       await _audioRecorder.start(config, path: path);
       _startTime = DateTime.now();
-      print('🎤 Recording started at: $path');
+      debugPrint('🎤 Recording started at: $path');
       
       setState(() {
         _isRecording = true;
         _isCancelled = false;
         _recordDuration = 0;
-        _recordedPath = path;
       });
 
       _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -93,7 +111,7 @@ class _ChatInputFieldState extends State<ChatInputField> {
       });
       
     } catch (e) {
-      print('❌ Error starting recording: $e');
+      debugPrint('❌ Error starting recording: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Recording failed: $e')),
       );
@@ -102,9 +120,16 @@ class _ChatInputFieldState extends State<ChatInputField> {
 
   Future<void> _stopRecording({bool send = true}) async {
     _timer?.cancel();
-    final path = await _audioRecorder.stop();
+    // Safety check if not recording
+    if (!_isRecording && !await _audioRecorder.isRecording()) return;
     
-    // Calculate precise duration
+    String? path;
+    try {
+       path = await _audioRecorder.stop();
+    } catch (e) {
+       debugPrint('Error stopping recorder: $e');
+    }
+    
     final duration = _startTime != null 
         ? DateTime.now().difference(_startTime!).inSeconds 
         : _recordDuration;
@@ -124,7 +149,6 @@ class _ChatInputFieldState extends State<ChatInputField> {
          }
          widget.onSendVoiceNote!(path, duration);
       } else {
-         print('Error: Voice note file is empty or missing');
          ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Failed to record voice note')),
          );
@@ -134,34 +158,12 @@ class _ChatInputFieldState extends State<ChatInputField> {
 
   void _handleDragUpdate(LongPressMoveUpdateDetails details) {
     if (!_isRecording) return;
-    
-    // Check if dragged far enough upwards or leftwards to cancel
-    // Negative dy means sliding UP
-    // Negative dx means sliding LEFT
-    
     final offset = details.localOffsetFromOrigin;
     if (offset.dy < -_cancelThreshold || offset.dx < -_cancelThreshold) {
-       if (!_isCancelled) {
-         setState(() {
-           _isCancelled = true;
-         });
-       }
+       if (!_isCancelled) setState(() => _isCancelled = true);
     } else {
-       if (_isCancelled) {
-         setState(() {
-           _isCancelled = false;
-         });
-       }
+       if (_isCancelled) setState(() => _isCancelled = false);
     }
-  }
-
-  Future<void> _cancelRecording() async {
-    _timer?.cancel();
-    await _audioRecorder.stop();
-    setState(() {
-      _isRecording = false;
-      _recordDuration = 0;
-    });
   }
 
   @override
@@ -169,6 +171,7 @@ class _ChatInputFieldState extends State<ChatInputField> {
     _timer?.cancel();
     _audioRecorder.dispose();
     _controller.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -177,6 +180,10 @@ class _ChatInputFieldState extends State<ChatInputField> {
     if (text.isNotEmpty) {
       widget.onSendMessage(text);
       _controller.clear();
+      setState(() {
+        _hasText = false; 
+        _showEmoji = false; // Close picker on send? Optional.
+      });
     }
   }
 
@@ -188,9 +195,9 @@ class _ChatInputFieldState extends State<ChatInputField> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
+             color: Colors.black.withValues(alpha: 0.05),
+             blurRadius: 10,
+             offset: const Offset(0, -2),
           ),
         ],
       ),
@@ -198,10 +205,8 @@ class _ChatInputFieldState extends State<ChatInputField> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Message input row (now first)
             Row(
               children: [
-                // Text input field
                 Expanded(
                   child: Container(
                     decoration: BoxDecoration(
@@ -213,6 +218,7 @@ class _ChatInputFieldState extends State<ChatInputField> {
                         Expanded(
                           child: TextField(
                             controller: _controller,
+                            focusNode: _focusNode,
                             decoration: const InputDecoration(
                               hintText: 'Type a message...',
                               hintStyle: TextStyle(
@@ -232,18 +238,13 @@ class _ChatInputFieldState extends State<ChatInputField> {
                         ),
                         // Emoji button
                         IconButton(
-                          icon: const Icon(Icons.emoji_emotions_outlined,
-                              color: AppColors.textSecondary, size: 24),
-                          onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Emoji picker coming soon!'),
-                                duration: Duration(seconds: 1),
-                              ),
-                            );
-                          },
+                          icon: Icon(
+                            _showEmoji ? Icons.keyboard : Icons.emoji_emotions_outlined,
+                            color: AppColors.textSecondary, 
+                            size: 24
+                          ),
+                          onPressed: _toggleEmojiKeyboard,
                         ),
-                        // Send button (always visible)
                         IconButton(
                           icon: Icon(
                             Icons.send_rounded,
@@ -259,55 +260,43 @@ class _ChatInputFieldState extends State<ChatInputField> {
                 ),
               ],
             ),
-            // Action buttons row (now below input)
+            
+            // Action buttons
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  // Video call button
                   _ActionButton(
                     icon: Icons.videocam_rounded,
                     label: 'Video',
                     color: AppColors.primary,
                     onPressed: widget.onVideoCallPressed ?? () {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Video call coming soon!'),
-                          duration: Duration(seconds: 1),
-                        ),
+                        const SnackBar(content: Text('Video call coming soon!')),
                       );
                     },
                   ),
-                  // Voice call button
                   _ActionButton(
                     icon: Icons.call,
                     label: 'Call',
                     color: AppColors.primary,
                     onPressed: widget.onVoiceCallPressed ?? () {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Voice call coming soon!'),
-                          duration: Duration(seconds: 1),
-                        ),
+                        const SnackBar(content: Text('Voice call coming soon!')),
                       );
                     },
                   ),
-                  // Image button
                   _ActionButton(
                     icon: Icons.image_rounded,
                     label: 'Image',
                     color: AppColors.primary,
                     onPressed: widget.onImagePressed ?? () {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Image picker coming soon!'),
-                          duration: Duration(seconds: 1),
-                        ),
+                        const SnackBar(content: Text('Image picker coming soon!')),
                       );
                     },
                   ),
-                  // Voice note button
                   GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onLongPressStart: (_) => _startRecording(),
@@ -315,40 +304,61 @@ class _ChatInputFieldState extends State<ChatInputField> {
                     onLongPressMoveUpdate: _handleDragUpdate,
                     onTap: () {
                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Press and hold to record'),
-                              duration: Duration(seconds: 1),
-                            ),
+                            const SnackBar(content: Text('Press and hold to record'), duration: Duration(seconds: 1)),
                           );
                     },
                     child: _ActionButton(
                       icon: _isRecording && !_isCancelled ? Icons.mic : Icons.mic_none,
                       label: _isRecording ? (_isCancelled ? 'Cancel' : 'Record') : 'Voice',
                       color: _isRecording 
-                        ? (_isCancelled ? Colors.red : AppColors.primary) // Red if cancelling
+                        ? (_isCancelled ? Colors.red : AppColors.primary)
                         : AppColors.primary,
-                      onPressed: null, // Handled by GestureDetector
+                      onPressed: null,
                     ),
                   ),
                 ],
               ),
             ),
+            
+            // Emoji Picker
+            if (_showEmoji)
+              SizedBox(
+                height: 250,
+                child: EmojiPicker(
+                  textEditingController: _controller,
+                  config: Config(
+                    height: 250,
+                    checkPlatformCompatibility: true,
+                    emojiViewConfig: EmojiViewConfig(
+                      backgroundColor: Colors.white,
+                      columns: 7,
+                      emojiSizeMax: 28 * (foundation.defaultTargetPlatform == TargetPlatform.iOS ? 1.20 : 1.0),
+                    ),
+                    categoryViewConfig: const CategoryViewConfig(
+                      indicatorColor: AppColors.primary,
+                      iconColorSelected: AppColors.primary,
+                      iconColor: Colors.grey,
+                    ),
+                    bottomActionBarConfig: const BottomActionBarConfig(
+                      enabled: false,
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
     );
   }
 
-
   Widget _buildRecordingUI() {
     final minutes = (_recordDuration ~/ 60).toString().padLeft(2, '0');
     final seconds = (_recordDuration % 60).toString().padLeft(2, '0');
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10), // Matched TextField padding
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         children: [
-          // Blinking recording indicator
           if (!_isCancelled)
             const SizedBox(
               width: 10,
@@ -386,19 +396,17 @@ class _ActionButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color color;
-  final VoidCallback? onPressed; // Made nullable
+  final VoidCallback? onPressed;
 
   const _ActionButton({
     required this.icon,
     required this.label,
     required this.color,
-    this.onPressed, // Optional
+    this.onPressed,
   });
 
   @override
   Widget build(BuildContext context) {
-    // If onPressed is null, we assume gesture is handled externally (e.g. by GestureDetector)
-    // So we just return the layout without InkWell to avoid gesture conflict
     if (onPressed == null) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -409,7 +417,7 @@ class _ActionButton extends StatelessWidget {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(icon, color: color, size: 20),
@@ -417,11 +425,7 @@ class _ActionButton extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               label,
-              style: TextStyle(
-                fontSize: 10,
-                color: color,
-                fontWeight: FontWeight.w500,
-              ),
+              style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w500),
             ),
           ],
         ),
@@ -440,7 +444,7 @@ class _ActionButton extends StatelessWidget {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(icon, color: color, size: 20),
@@ -448,11 +452,7 @@ class _ActionButton extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               label,
-              style: TextStyle(
-                fontSize: 10,
-                color: color,
-                fontWeight: FontWeight.w500,
-              ),
+              style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w500),
             ),
           ],
         ),

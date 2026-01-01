@@ -10,9 +10,9 @@ Future<void> main() async {
     // Initialize Supabase
     await SupabaseService.initialize();
   } catch (e) {
-    print('Failed to initialize Supabase: $e');
-    print('The app will continue with limited functionality.');
-    print('Please check your .env file and Supabase credentials.');
+    debugPrint('Failed to initialize Supabase: $e');
+    debugPrint('The app will continue with limited functionality.');
+    debugPrint('Please check your .env file and Supabase credentials.');
   }
   
   runApp(

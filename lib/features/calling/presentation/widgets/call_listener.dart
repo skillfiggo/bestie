@@ -5,6 +5,7 @@ import 'package:bestie/core/services/supabase_service.dart';
 import 'package:bestie/features/calling/presentation/screens/call_screen.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:bestie/features/chat/data/repositories/call_repository.dart';
+import 'package:bestie/core/services/audio_service.dart';
 
 class CallListener extends ConsumerStatefulWidget {
   final Widget child;
@@ -15,7 +16,6 @@ class CallListener extends ConsumerStatefulWidget {
 }
 
 class _CallListenerState extends ConsumerState<CallListener> {
-  late final Stream<List<Map<String, dynamic>>> _messagesStream;
   bool _isStreamInitialized = false;
   final Set<String> _handledMessageIds = {}; // Track handled call messages
 
@@ -62,7 +62,7 @@ class _CallListenerState extends ConsumerState<CallListener> {
     if (isCall) {
       // Check if we've already handled this message
       if (_handledMessageIds.contains(messageId)) {
-        print('Call message already handled: $messageId');
+        debugPrint('Call message already handled: $messageId');
         return;
       }
       
@@ -71,7 +71,7 @@ class _CallListenerState extends ConsumerState<CallListener> {
       final callIdMatch = RegExp(r'\[call_id:([^\]]+)\]').firstMatch(content);
       if (callIdMatch != null) {
         callHistoryId = callIdMatch.group(1);
-        print('📞 Extracted call_history_id: $callHistoryId');
+        debugPrint('📞 Extracted call_history_id: $callHistoryId');
       }
       
       // Mark this message as handled
@@ -93,6 +93,9 @@ class _CallListenerState extends ConsumerState<CallListener> {
       final isVerified = callerProfile['is_verified'] as bool? ?? false;
       
       if (!mounted) return;
+      
+      // Play incoming ringtone
+      ref.read(audioServiceProvider).playIncomingRingtone();
       
       showDialog(
         context: context,
@@ -182,6 +185,9 @@ class _CallListenerState extends ConsumerState<CallListener> {
                   Expanded(
                     child: TextButton(
                       onPressed: () {
+                        // Stop ringtone
+                        ref.read(audioServiceProvider).stop();
+                        
                         // Notify database about rejection
                         if (callHistoryId != null) {
                            ref.read(callRepositoryProvider).rejectCall(callHistoryId);
@@ -240,6 +246,9 @@ class _CallListenerState extends ConsumerState<CallListener> {
                         }
 
                         if (context.mounted) {
+                          // Stop ringtone
+                          ref.read(audioServiceProvider).stop();
+                          
                           Navigator.pop(context); // Close dialog
                           Navigator.push(
                             context,

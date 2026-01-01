@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:bestie/core/services/supabase_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -24,7 +25,7 @@ class SystemConfigRepository {
       return adsJson.map((e) => e.toString()).toList();
     } catch (e) {
       // Return empty list on error, UI should handle fallback
-      print('Error fetching banner ads: $e');
+      debugPrint('Error fetching banner ads: $e');
       return [];
     }
   }

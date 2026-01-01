@@ -77,45 +77,8 @@ class PrivacySettingsScreen extends ConsumerWidget {
             onChanged: (value) => ref.read(showProfileVisitsProvider.notifier).state = value,
           ),
 
-          const SizedBox(height: 24),
-          _buildSectionHeader('Communication'),
-          _buildSelectionTile(
-            context,
-            icon: Icons.message_outlined,
-            iconColor: Colors.purple,
-            title: 'Who can message me',
-            value: _formatSelection(allowMessagesFrom),
-            onTap: () => _showSelectionDialog(
-              context,
-              ref,
-              'Who can message me',
-              allowMessagesFrom,
-              allowMessagesFromProvider,
-            ),
-          ),
-          _buildSelectionTile(
-            context,
-            icon: Icons.call_outlined,
-            iconColor: Colors.teal,
-            title: 'Who can call me',
-            value: _formatSelection(allowCallsFrom),
-            onTap: () => _showSelectionDialog(
-              context,
-              ref,
-              'Who can call me',
-              allowCallsFrom,
-              allowCallsFromProvider,
-            ),
-          ),
-          _buildSwitchTile(
-            context,
-            icon: Icons.done_all_rounded,
-            iconColor: Colors.blue,
-            title: 'Read Receipts',
-            subtitle: 'Let others know when you\'ve read their messages',
-            value: readReceipts,
-            onChanged: (value) => ref.read(readReceiptsProvider.notifier).state = value,
-          ),
+
+
 
           const SizedBox(height: 24),
           _buildSectionHeader('Profile Visibility'),
@@ -210,7 +173,7 @@ class PrivacySettingsScreen extends ConsumerWidget {
       leading: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: iconColor.withOpacity(0.1),
+          color: iconColor.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Icon(icon, color: iconColor, size: 22),
@@ -233,7 +196,7 @@ class PrivacySettingsScreen extends ConsumerWidget {
       trailing: Switch(
         value: value,
         onChanged: onChanged,
-        activeColor: AppColors.primary,
+        activeThumbColor: AppColors.primary,
       ),
     );
   }
@@ -251,7 +214,7 @@ class PrivacySettingsScreen extends ConsumerWidget {
       leading: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: iconColor.withOpacity(0.1),
+          color: iconColor.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Icon(icon, color: iconColor, size: 22),
@@ -290,7 +253,7 @@ class PrivacySettingsScreen extends ConsumerWidget {
       leading: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: iconColor.withOpacity(0.1),
+          color: iconColor.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Icon(icon, color: iconColor, size: 22),

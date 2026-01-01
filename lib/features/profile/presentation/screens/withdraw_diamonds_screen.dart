@@ -126,7 +126,7 @@ class _WithdrawDiamondsScreenState extends State<WithdrawDiamondsScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
@@ -230,7 +230,7 @@ class _WithdrawDiamondsScreenState extends State<WithdrawDiamondsScreen> {
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: isSelected 
-                        ? AppColors.primary.withOpacity(0.1) 
+                        ? AppColors.primary.withValues(alpha: 0.1) 
                         : Colors.grey.shade50,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
@@ -260,7 +260,7 @@ class _WithdrawDiamondsScreenState extends State<WithdrawDiamondsScreen> {
                   ),
                 ),
               );
-            }).toList(),
+            }),
             const SizedBox(height: 32),
 
             // Info Box

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:bestie/core/services/supabase_service.dart';
 import 'package:bestie/features/admin/domain/models/report_model.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -90,7 +91,7 @@ class ReportsRepository {
           .eq('status', 'pending');
       return (response as List).length;
     } catch (e) {
-      print('Error fetching pending reports count: $e');
+      debugPrint('Error fetching pending reports count: $e');
       return 0;
     }
   }
@@ -166,7 +167,7 @@ class ReportsRepository {
       final data = response as List<dynamic>;
       return data.map((item) => item['blocked_id'] as String).toList();
     } catch (e) {
-      print('Error fetching blocked users: $e');
+      debugPrint('Error fetching blocked users: $e');
       return [];
     }
   }
@@ -188,7 +189,7 @@ class ReportsRepository {
 
       return response != null;
     } catch (e) {
-      print('Error checking if user is blocked: $e');
+      debugPrint('Error checking if user is blocked: $e');
       return false;
     }
   }

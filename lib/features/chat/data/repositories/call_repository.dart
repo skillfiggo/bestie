@@ -1,7 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bestie/core/services/supabase_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:bestie/features/chat/domain/models/call_history_model.dart';
 
 final callRepositoryProvider = Provider((ref) => CallRepository());
 
@@ -16,8 +16,8 @@ class CallRepository {
     required String mediaType, // 'video' or 'voice'
   }) async {
     try {
-      print('📞 Starting call - Creating call_history record');
-      print('📞 Caller: $callerId, Receiver: $receiverId, Media: $mediaType');
+      debugPrint('📞 Starting call - Creating call_history record');
+      debugPrint('📞 Caller: $callerId, Receiver: $receiverId, Media: $mediaType');
       
       // 1. Log to call_history
       final response = await _client.from('call_history').insert({
@@ -30,12 +30,12 @@ class CallRepository {
       }).select().single();
       
       final callHistoryId = response['id'] as String;
-      print('📞 Call_history record created successfully: $callHistoryId');
-      print('📞 Full response: $response');
+      debugPrint('📞 Call_history record created successfully: $callHistoryId');
+      debugPrint('📞 Full response: $response');
 
       // 2. Insert message in chat to notify user (Signaling MVP)
       // Include call_history_id in message content so receiver can listen to same record
-      print('📞 Sending invitation message to chat: $channelId');
+      debugPrint('📞 Sending invitation message to chat: $channelId');
       await _client.from('messages').insert({
         'chat_id': channelId,
         'sender_id': callerId,
@@ -45,11 +45,11 @@ class CallRepository {
         'status': 'sent',
       });
       
-      print('📞 Invitation message sent successfully');
+      debugPrint('📞 Invitation message sent successfully');
       return callHistoryId; // Return call history ID
     } catch (e, stackTrace) {
-      print('❌ ERROR in startCall: $e');
-      print('❌ Stack trace: $stackTrace');
+      debugPrint('❌ ERROR in startCall: $e');
+      debugPrint('❌ Stack trace: $stackTrace');
       rethrow;
     }
   }
@@ -63,49 +63,50 @@ class CallRepository {
           .single();
       return response['status'] as String?;
     } catch (e) {
-      print('⚠️ Error fetching call status: $e');
+      debugPrint('⚠️ Error fetching call status: $e');
       return null;
     }
   }
 
-  Future<void> endCall(String callHistoryId, int durationSeconds) async {
+  Future<void> endCall(String callHistoryId, int durationSeconds, {String status = 'ended'}) async {
     if (callHistoryId.isEmpty) return;
     
     try {
-      print('📝 Updating call_history: $callHistoryId with duration: $durationSeconds, status: ended');
+      debugPrint('📝 Updating call_history: $callHistoryId with duration: $durationSeconds, status: $status');
       // Using simple update without select to avoid RLS issues if any
       await _client.from('call_history').update({
         'duration_seconds': durationSeconds,
-        'status': 'ended',
+        'status': status,
       }).eq('id', callHistoryId);
       
-      print('📝 Update successful!');
+      debugPrint('📝 Update successful!');
     } catch (e, stackTrace) {
-      print('❌ ERROR updating call_history: $e');
-      print('Stack trace: $stackTrace');
+      debugPrint('❌ ERROR updating call_history: $e');
+      debugPrint('Stack trace: $stackTrace');
       rethrow;
     }
   }
 
   Future<void> rejectCall(String callHistoryId) async {
     try {
-      print('📞 Rejecting call: $callHistoryId');
+      debugPrint('📞 Rejecting call: $callHistoryId');
       await _client.from('call_history').update({
         'status': 'rejected',
         // 'ended_at': DateTime.now().toIso8601String(), // TODO: Uncomment after running supabase_call_history_update.sql
       }).eq('id', callHistoryId);
-      print('✅ Call rejected successfully');
+      debugPrint('✅ Call rejected successfully');
     } catch (e) {
-      print('❌ Error rejecting call: $e');
+      debugPrint('❌ Error rejecting call: $e');
       rethrow;
     }
   }
 
-  /// Create a realtime channel to listen for call status changes
   Future<RealtimeChannel> setupCallStatusListener({
     required String callHistoryId,
     required Function() onCallEnded,
   }) async {
+    // ... existing implementation ...
+    // Create channel for both database changes and broadcast messaging
     final channel = _client.channel('call_status:$callHistoryId');
     
     channel.onPostgresChanges(
@@ -118,28 +119,46 @@ class CallRepository {
         value: callHistoryId,
       ),
       callback: (payload) {
-        print('🔄 Received postgres change event!');
-        print('🔄 Payload: $payload');
+        debugPrint('🔄 Received postgres change event!');
         final newRecord = payload.newRecord;
-        print('🔄 New record: $newRecord');
-        print('🔄 Status value: ${newRecord['status']}');
         
         final terminalStatuses = {'ended', 'rejected', 'canceled', 'timeout', 'completed'};
         
         if (newRecord['status'] != null && terminalStatuses.contains(newRecord['status'])) {
-          print('📡 Call terminal signal received from database: ${newRecord['status']}');
+          debugPrint('📡 Call terminal signal received from database: ${newRecord['status']}');
           onCallEnded();
-        } else {
-          print('⚠️ Status is not terminal, it is: ${newRecord['status']}');
         }
       },
     );
     
     // Wait for subscription to complete before returning
-    await channel.subscribe();
-    print('✅ Realtime listener subscribed and ready');
+    channel.subscribe();
+    debugPrint('✅ Realtime listener subscribed and ready');
     
     return channel;
+  }
+
+  /// Send a missed call system message (Bypasses coin deduction)
+  Future<void> sendMissedCallMessage({
+    required String chatId,
+    required String senderId,
+    required String receiverId,
+    required bool isVideo,
+  }) async {
+    try {
+      final type = isVideo ? 'video' : 'voice';
+      await _client.from('messages').insert({
+        'chat_id': chatId,
+        'sender_id': senderId,
+        'receiver_id': receiverId,
+        'content': '📞 Missed $type call',
+        'message_type': 'text',
+        'status': 'sent',
+      });
+      debugPrint('📧 Missed call message inserted');
+    } catch (e) {
+      debugPrint('❌ Failed to send missed call message: $e');
+    }
   }
 
 

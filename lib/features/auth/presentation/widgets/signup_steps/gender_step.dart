@@ -80,7 +80,7 @@ class _GenderCard extends StatelessWidget {
           border: Border.all(color: Colors.grey.shade200),
           boxShadow: [
             BoxShadow(
-              color: color.withOpacity(0.2),
+              color: color.withValues(alpha: 0.2),
               blurRadius: 15,
               offset: const Offset(0, 8),
             ),
@@ -91,10 +91,10 @@ class _GenderCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.2),
+                color: color.withValues(alpha: 0.2),
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, size: 32, color: color.withOpacity(0.8)), // Darker shade for icon
+              child: Icon(icon, size: 32, color: color.withValues(alpha: 0.8)), // Darker shade for icon
             ),
             const SizedBox(width: 24),
             Text(

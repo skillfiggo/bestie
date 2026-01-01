@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
@@ -46,9 +47,9 @@ class SupabaseService {
 
       _client = Supabase.instance.client;
       
-      print('✅ Supabase initialized successfully');
+      debugPrint('✅ Supabase initialized successfully');
     } catch (e) {
-      print('❌ Supabase initialization failed: $e');
+      debugPrint('❌ Supabase initialization failed: $e');
       rethrow;
     }
   }

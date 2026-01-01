@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bestie/core/constants/app_colors.dart';
-import 'package:bestie/features/moment/domain/models/moment.dart';
 import 'package:bestie/features/moment/presentation/widgets/moment_card.dart';
 import 'package:bestie/features/home/presentation/widgets/ad_banner.dart';
 import 'package:bestie/features/moment/data/providers/moment_providers.dart';

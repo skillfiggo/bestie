@@ -440,7 +440,7 @@ class _PersonalInformationScreenState extends ConsumerState<PersonalInformationS
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary.withOpacity(0.1) : Colors.grey.shade100,
+          color: isSelected ? AppColors.primary.withValues(alpha: 0.1) : Colors.grey.shade100,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected ? AppColors.primary : Colors.grey.shade300,
@@ -549,7 +549,7 @@ class _PersonalInformationScreenState extends ConsumerState<PersonalInformationS
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: iconColor.withOpacity(0.1),
+              color: iconColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(icon, color: iconColor, size: 20),

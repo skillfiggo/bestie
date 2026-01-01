@@ -55,6 +55,8 @@ dependencies:
   path_provider: ^2.1.5
   font_awesome_flutter: ^10.12.0
   flutter_svg: ^2.0.10
+  http: ^1.2.0
+  emoji_picker_flutter: ^4.4.0
 
 dev_dependencies:
   flutter_test:
@@ -85,6 +87,7 @@ flutter:
     - .env
     - assets/images/
     - assets/images/icons/
+    - assets/sounds/
 
 
   # An image asset can refer to one or more resolution-specific "variants", see

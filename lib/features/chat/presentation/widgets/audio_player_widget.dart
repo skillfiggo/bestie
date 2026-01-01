@@ -82,7 +82,7 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget> {
         try {
           await _audioPlayer.play(UrlSource(widget.url));
         } catch (e) {
-             print('Error playing audio: $e');
+             debugPrint('Error playing audio: $e');
         } finally {
           if (mounted) {
             setState(() {
@@ -131,9 +131,9 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget> {
                     thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
                     overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
                     activeTrackColor: color,
-                    inactiveTrackColor: secondaryColor.withOpacity(0.3),
+                    inactiveTrackColor: secondaryColor.withValues(alpha: 0.3),
                     thumbColor: color,
-                    overlayColor: color.withOpacity(0.1),
+                    overlayColor: color.withValues(alpha: 0.1),
                   ),
                   child: Slider(
                     value: _position.inSeconds.toDouble(),

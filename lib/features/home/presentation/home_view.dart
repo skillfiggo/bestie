@@ -7,7 +7,6 @@ import 'package:bestie/features/home/presentation/widgets/ad_banner.dart';
 import 'package:bestie/features/visitor/presentation/visitor_view.dart';
 import 'package:bestie/features/home/presentation/widgets/nearby_view.dart';
 import 'package:bestie/features/profile/data/repositories/profile_repository.dart';
-import 'package:bestie/features/chat/data/repositories/chat_repository.dart';
 import 'package:bestie/features/chat/presentation/screens/chat_detail_screen.dart';
 import 'package:bestie/features/chat/data/providers/chat_providers.dart';
 import 'package:bestie/features/calling/presentation/screens/call_screen.dart';
@@ -17,6 +16,7 @@ import 'package:bestie/features/chat/data/repositories/call_repository.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import 'package:bestie/features/admin/data/repositories/admin_repository.dart';
+import 'package:bestie/features/home/presentation/widgets/search_user_delegate.dart';
 
 class HomeView extends ConsumerStatefulWidget {
   const HomeView({super.key});
@@ -28,17 +28,20 @@ class HomeView extends ConsumerStatefulWidget {
 class _HomeViewState extends ConsumerState<HomeView> {
   // Filter State
   RangeValues _ageRange = const RangeValues(18, 80);
-  List<ProfileModel> _profiles = [];
+  
+  // Data State
+  List<ProfileModel> _recommendProfiles = [];
+  List<ProfileModel> _newcomerProfiles = [];
   bool _isLoading = true;
   String? _error;
-  bool _isStartingCall = false; // Prevent duplicate call requests
+  bool _isStartingCall = false;
   
-  static final Set<String> _seenBroadcasts = {}; // Session-based seen tracking
+  static final Set<String> _seenBroadcasts = {};
 
   @override
   void initState() {
     super.initState();
-    _loadProfiles();
+    _loadAllData();
     _checkBroadcast();
   }
   
@@ -73,7 +76,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
                         child: Image.network(
                           broadcast.imageUrl!, 
                           fit: BoxFit.cover,
-                          errorBuilder: (c, e, s) => const SizedBox.shrink(), // Hide if load fails
+                          errorBuilder: (c, e, s) => const SizedBox.shrink(),
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -85,8 +88,6 @@ class _HomeViewState extends ConsumerState<HomeView> {
                           width: double.infinity,
                           child: ElevatedButton.icon(
                              onPressed: () { 
-                                // TODO: Implement URL launching
-                                // launchUrl(Uri.parse(broadcast.linkUrl!));
                                 Navigator.pop(context);
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(content: Text('Link tapped: ${broadcast.linkUrl}')),
@@ -115,27 +116,30 @@ class _HomeViewState extends ConsumerState<HomeView> {
         }
       }
     } catch (e) {
-      print('Failed to fetch broadcast: $e');
+      debugPrint('Failed to fetch broadcast: $e');
     }
   }
 
-  Future<void> _loadProfiles() async {
+  Future<void> _loadAllData() async {
     setState(() {
       _isLoading = true;
       _error = null;
     });
 
     try {
-      // In a real app, you might want to switch gender filter based on user preference
-      // For now, let's fetch all (repository handles exclusion of self)
-      final profiles = await ref.read(profileRepositoryProvider).getDiscoveryProfiles(
-        minAge: _ageRange.start.round(),
-        maxAge: _ageRange.end.round(),
-      );
-
+      // Fetch both Recommended and Newcomers in parallel
+      final results = await Future.wait([
+        ref.read(profileRepositoryProvider).getDiscoveryProfiles(
+          minAge: _ageRange.start.round(),
+          maxAge: _ageRange.end.round(),
+        ),
+        ref.read(profileRepositoryProvider).getNewcomerProfiles(limit: 50),
+      ]);
+      
       if (mounted) {
         setState(() {
-          _profiles = profiles;
+          _recommendProfiles = results[0];
+          _newcomerProfiles = results[1];
           _isLoading = false;
         });
       }
@@ -156,7 +160,6 @@ class _HomeViewState extends ConsumerState<HomeView> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) {
-        // Use StatefulBuilder to update the bottom sheet state independently
         return StatefulBuilder(
           builder: (context, setModalState) {
             return Padding(
@@ -182,17 +185,12 @@ class _HomeViewState extends ConsumerState<HomeView> {
                     ],
                   ),
                   const SizedBox(height: 24),
-                  
-                  // Age Range Label
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text(
                         'Age Range',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                        ),
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                       ),
                       Text(
                         '${_ageRange.start.round()} - ${_ageRange.end.round()}',
@@ -205,15 +203,13 @@ class _HomeViewState extends ConsumerState<HomeView> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  
-                  // Slider
                   RangeSlider(
                     values: _ageRange,
                     min: 18,
                     max: 80,
-                    divisions: 62, // One division per year
+                    divisions: 62,
                     activeColor: AppColors.primary,
-                    inactiveColor: AppColors.primary.withOpacity(0.2),
+                    inactiveColor: AppColors.primary.withValues(alpha: 0.2),
                     labels: RangeLabels(
                       _ageRange.start.round().toString(),
                       _ageRange.end.round().toString(),
@@ -222,26 +218,15 @@ class _HomeViewState extends ConsumerState<HomeView> {
                       setModalState(() {
                         _ageRange = values;
                       });
-                      // Update parent state as well? No, wait for Apply.
                     },
                   ),
                   const SizedBox(height: 32),
-                  
-                  // Apply Button
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: () {
-                        // Update parent state and reload
-                        setState(() {
-                          // _ageRange is already updated in modal? No, local var in modal. 
-                          // Wait, I used _ageRange which is parent's var. 
-                          // Logic above: setModalState updates UI, but does it update parent var? 
-                          // It updates _ageRange because it's captured in closure? 
-                          // Yes, but setState in parent is needed to trigger rebuild of parent? 
-                          // Or we just call _loadProfiles() which calls setState.
-                        });
-                        _loadProfiles();
+                        setState(() {}); // Update filters in parent
+                        _loadAllData();
                         Navigator.pop(context);
                       },
                       style: ElevatedButton.styleFrom(
@@ -252,13 +237,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child: const Text(
-                        'Apply Filters',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                      child: const Text('Apply Filters', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -274,18 +253,14 @@ class _HomeViewState extends ConsumerState<HomeView> {
   Future<void> _handleStartCall({
     required String profileId,
     required bool isVideo,
-  }) async {    // Prevent duplicate calls
-    if (_isStartingCall) {
-      print('⚠️ Already starting a call, ignoring duplicate request');
-      return;
-    }
+  }) async {
+    if (_isStartingCall) return;
 
     setState(() {
       _isStartingCall = true;
     });
 
     try {
-      // Request permissions first
       final micPermission = await Permission.microphone.request();
       PermissionStatus? cameraPermission;
       
@@ -293,7 +268,6 @@ class _HomeViewState extends ConsumerState<HomeView> {
         cameraPermission = await Permission.camera.request();
       }
 
-      // Check if permissions granted
       final micGranted = micPermission.isGranted;
       final cameraGranted = isVideo ? (cameraPermission?.isGranted ?? false) : true;
 
@@ -316,23 +290,16 @@ class _HomeViewState extends ConsumerState<HomeView> {
         return;
       }
 
-      // Permissions granted, create chat and start call
-      // Permissions granted, create chat and start call
       final chat = await ref.read(chatRepositoryProvider).createOrGetChat(profileId);
-      
-      // Get current user ID
       final currentUserId = ref.read(authRepositoryProvider).getCurrentUser()?.id;
       if (currentUserId == null) throw Exception('User not logged in');
       
-      // Create call session
-      print('📞 Creating call session...');
       final callHistoryId = await ref.read(callRepositoryProvider).startCall(
         channelId: chat.id,
         callerId: currentUserId,
         receiverId: profileId,
         mediaType: isVideo ? 'video' : 'voice',
       );
-      print('✅ Call session created: $callHistoryId');
 
       if (mounted) {
         Navigator.push(
@@ -349,7 +316,6 @@ class _HomeViewState extends ConsumerState<HomeView> {
         );
       }
     } catch (e) {
-      print('❌ Error starting call: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to start call: $e')),
@@ -371,17 +337,19 @@ class _HomeViewState extends ConsumerState<HomeView> {
       child: Scaffold(
         backgroundColor: Colors.grey.shade50,
         appBar: AppBar(
-          title: const Text(
-            'Discover',
-            style: TextStyle(
-              color: AppColors.textPrimary,
-              fontWeight: FontWeight.bold,
-              fontSize: 24,
-            ),
-          ),
           backgroundColor: Colors.white,
           elevation: 0,
           actions: [
+            IconButton(
+              icon: const Icon(Icons.search, color: AppColors.textPrimary),
+              tooltip: 'Search User',
+              onPressed: () {
+                showSearch(
+                  context: context,
+                  delegate: SearchUserDelegate(ref),
+                );
+              },
+            ),
             IconButton(
               icon: const Icon(Icons.favorite_rounded, color: AppColors.primary),
               tooltip: 'Visitors',
@@ -398,7 +366,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
             ),
           ],
           bottom: PreferredSize(
-            preferredSize: const Size.fromHeight(130), // Banner (60+16) + TabBar (50) + spacing
+            preferredSize: const Size.fromHeight(130),
             child: Column(
               children: [
                 const AdBanner(),
@@ -415,15 +383,9 @@ class _HomeViewState extends ConsumerState<HomeView> {
                     fontWeight: FontWeight.normal,
                   ),
                   tabs: [
-                    Tab(
-                      text: 'Recommend',
-                    ),
-                    Tab(
-                      text: 'Newcomer',
-                    ),
-                    Tab(
-                      text: 'Nearby',
-                    ),
+                    Tab(text: 'Recommend'),
+                    Tab(text: 'Newcomer'),
+                    Tab(text: 'Nearby'),
                   ],
                 ),
               ],
@@ -433,9 +395,9 @@ class _HomeViewState extends ConsumerState<HomeView> {
         body: TabBarView(
           children: [
             // Recommended Tab
-            _buildProfileList(),
-            // Newcomer Tab (Could be different query/sort in future)
-            _buildProfileList(),
+            _buildProfileList(_recommendProfiles, emptyMessage: 'No recommendations found'),
+            // Newcomer Tab
+            _buildProfileList(_newcomerProfiles, emptyMessage: 'No newcomers yet'),
             // Nearby Tab
             const NearbyView(),
           ],
@@ -444,7 +406,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
     );
   }
 
-  Widget _buildProfileList() {
+  Widget _buildProfileList(List<ProfileModel> profiles, {String emptyMessage = 'No profiles found'}) {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -453,7 +415,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
       return Center(child: Text('Error: $_error'));
     }
 
-    return _profiles.isEmpty
+    return profiles.isEmpty
         ? Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -461,7 +423,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
                 Icon(Icons.filter_list_off, size: 64, color: Colors.grey.shade300),
                 const SizedBox(height: 16),
                 Text(
-                  'No profiles found',
+                  emptyMessage,
                   style: TextStyle(
                     color: Colors.grey.shade600,
                     fontSize: 18,
@@ -472,19 +434,19 @@ class _HomeViewState extends ConsumerState<HomeView> {
                   child: const Text('Adjust Filters')
                 ),
                 TextButton(
-                  onPressed: _loadProfiles, 
+                  onPressed: _loadAllData, 
                   child: const Text('Retry')
                 ),
               ],
             ),
           )
         : RefreshIndicator(
-            onRefresh: _loadProfiles,
+            onRefresh: _loadAllData,
             child: ListView.builder(
               padding: const EdgeInsets.all(16),
-              itemCount: _profiles.length,
+              itemCount: profiles.length,
               itemBuilder: (context, index) {
-                final profile = _profiles[index];
+                final profile = profiles[index];
                 return ProfileCard(
                   profile: profile,
                   onTap: () {
@@ -497,13 +459,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
                   },
                   onChatTap: () async {
                      try {
-                        // Optimistic navigation or show loading?
-                        // Let's show loading dialog or just wait.
-                        // Ideally better to have a loading state on the button itself but ProfileCard is simple.
-                        
-                        // Fetch/Create chat
                         final chat = await ref.read(chatRepositoryProvider).createOrGetChat(profile.id);
-                        
                         if (context.mounted) {
                           Navigator.push(
                             context,

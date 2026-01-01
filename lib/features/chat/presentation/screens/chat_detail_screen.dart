@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -131,8 +130,12 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       Future.delayed(const Duration(milliseconds: 300), _scrollToBottom);
     } catch (e) {
       if (mounted) {
+        final errorMessage = e.toString().replaceAll('Exception: ', '');
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to send message: $e')),
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: AppColors.error,
+          ),
         );
       }
     }
@@ -244,7 +247,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   Future<void> _handleStartCall({required bool isVideo}) async {
     // Prevent duplicate calls
     if (_isStartingCall) {
-      print('⚠️ Already starting a call, ignoring duplicate request');
+      debugPrint('⚠️ Already starting a call, ignoring duplicate request');
       return;
     }
 
@@ -288,14 +291,14 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       
       // 1. Create call session via REST API first
       // This ensures invitation is sent before we even show the call screen
-      print('📞 Creating call session...');
+      debugPrint('📞 Creating call session...');
       final callHistoryId = await ref.read(callRepositoryProvider).startCall(
         channelId: widget.chat.id,
         callerId: currentUserId,
         receiverId: widget.chat.otherUserId,
         mediaType: isVideo ? 'video' : 'voice',
       );
-      print('✅ Call session created: $callHistoryId');
+      debugPrint('✅ Call session created: $callHistoryId');
 
       if (mounted) {
         Navigator.push(
@@ -312,7 +315,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         );
       }
     } catch (e) {
-      print('❌ Error starting call: $e');
+      debugPrint('❌ Error starting call: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to start call: $e')),
@@ -578,7 +581,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
           decoration: BoxDecoration(
-            color: AppColors.textSecondary.withOpacity(0.1),
+            color: AppColors.textSecondary.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Text(

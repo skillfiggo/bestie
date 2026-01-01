@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:bestie/core/constants/app_colors.dart';
 
 class RechargeCoinsScreen extends StatefulWidget {
@@ -12,13 +13,17 @@ class _RechargeCoinsScreenState extends State<RechargeCoinsScreen> {
   int? _selectedPackage;
 
   final List<Map<String, dynamic>> _coinPackages = [
-    {'coins': 100, 'price': 0.99, 'bonus': 0},
-    {'coins': 500, 'price': 4.99, 'bonus': 50},
-    {'coins': 1000, 'price': 9.99, 'bonus': 150},
-    {'coins': 2500, 'price': 19.99, 'bonus': 500},
-    {'coins': 5000, 'price': 39.99, 'bonus': 1200},
-    {'coins': 10000, 'price': 69.99, 'bonus': 3000},
+    {'coins': 1000, 'price': 1800, 'bonus': 0},
+    {'coins': 2100, 'price': 3500, 'bonus': 0},
+    {'coins': 5200, 'price': 8500, 'bonus': 0},
+    {'coins': 10500, 'price': 17000, 'bonus': 0},
   ];
+
+  final _currencyFormat = NumberFormat.currency(
+    locale: 'en_NG',
+    symbol: '₦',
+    decimalDigits: 0,
+  );
 
   void _handlePurchase() {
     if (_selectedPackage == null) {
@@ -124,6 +129,7 @@ class _RechargeCoinsScreenState extends State<RechargeCoinsScreen> {
                 final package = _coinPackages[index];
                 final isSelected = _selectedPackage == index;
                 final hasBonus = package['bonus'] > 0;
+                final formattedPrice = _currencyFormat.format(package['price']);
 
                 return GestureDetector(
                   onTap: () {
@@ -136,7 +142,7 @@ class _RechargeCoinsScreenState extends State<RechargeCoinsScreen> {
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: isSelected 
-                          ? AppColors.primary.withOpacity(0.1) 
+                          ? AppColors.primary.withValues(alpha: 0.1) 
                           : Colors.grey.shade50,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
@@ -165,38 +171,42 @@ class _RechargeCoinsScreenState extends State<RechargeCoinsScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
-                                children: [
-                                  Text(
-                                    '${package['coins']} Coins',
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.textPrimary,
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: Row(
+                                  children: [
+                                    Text(
+                                      '${package['coins']} Coins',
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.textPrimary,
+                                      ),
                                     ),
-                                  ),
-                                  if (hasBonus) ...[
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 2,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.primary,
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: Text(
-                                        '+${package['bonus']} Bonus',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
+                                    if (hasBonus) ...[
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primary,
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          '+${package['bonus']} Bonus',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
                                       ),
-                                    ),
+                                    ],
                                   ],
-                                ],
+                                ),
                               ),
                               if (hasBonus)
                                 Text(
@@ -211,7 +221,7 @@ class _RechargeCoinsScreenState extends State<RechargeCoinsScreen> {
                         ),
                         // Price
                         Text(
-                          '\$${package['price'].toStringAsFixed(2)}',
+                          formattedPrice,
                           style: const TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
@@ -233,7 +243,7 @@ class _RechargeCoinsScreenState extends State<RechargeCoinsScreen> {
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 10,
                   offset: const Offset(0, -2),
                 ),
@@ -256,7 +266,7 @@ class _RechargeCoinsScreenState extends State<RechargeCoinsScreen> {
                   child: Text(
                     _selectedPackage == null
                         ? 'Select a Package'
-                        : 'Purchase for \$${_coinPackages[_selectedPackage!]['price'].toStringAsFixed(2)}',
+                        : 'Purchase for ${_currencyFormat.format(_coinPackages[_selectedPackage!]['price'])}',
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,

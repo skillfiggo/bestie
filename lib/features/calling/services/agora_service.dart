@@ -20,9 +20,9 @@ class AgoraService {
     if (_isInitialized) return;
 
     String appId = dotenv.env['AGORA_APP_ID'] ?? '';
-    print('🔴 Debug - Loaded Agora App ID: ${appId.isEmpty ? "EMPTY" : "${appId.substring(0, 5)}..."}'); 
+    debugPrint('🔴 Debug - Loaded Agora App ID: ${appId.isEmpty ? "EMPTY" : "${appId.substring(0, 5)}..."}'); 
     if (appId.isEmpty || appId == 'YOUR_AGORA_APP_ID_HERE') {
-      print('🔴 Agora App ID is missing or invalid in .env');
+      debugPrint('🔴 Agora App ID is missing or invalid in .env');
       if (appId.isEmpty) return;
     }
 
@@ -42,18 +42,21 @@ class AgoraService {
     _engine.registerEventHandler(
       RtcEngineEventHandler(
         onJoinChannelSuccess: (RtcConnection connection, int elapsed) {
-          print("✅ JOINED CHANNEL SUCCESS: ${connection.channelId} uid=${connection.localUid}");
+          debugPrint("✅ JOINED CHANNEL SUCCESS: ${connection.channelId} uid=${connection.localUid}");
         },
         onUserJoined: (RtcConnection connection, int remoteUid, int elapsed) {
-          print("REMOTE JOINED: $remoteUid");
+          debugPrint("REMOTE JOINED: $remoteUid");
           onUserJoined?.call(remoteUid);
         },
         onUserOffline: (RtcConnection connection, int remoteUid, UserOfflineReasonType reason) {
-          print("REMOTE LEFT: $remoteUid");
+          debugPrint("REMOTE LEFT: $remoteUid");
           onUserOffline?.call(remoteUid);
         },
+        onRemoteVideoStateChanged: (RtcConnection connection, int remoteUid, RemoteVideoState state, RemoteVideoStateReason reason, int elapsed) {
+          debugPrint("REMOTE VIDEO STATE CHANGED: uid=$remoteUid, state=$state, reason=$reason");
+        },
         onError: (ErrorCodeType err, String msg) {
-          print("🔴 Agora Error: $err - $msg");
+          debugPrint("🔴 Agora Error: $err - $msg");
         },
       ),
     );
@@ -73,26 +76,31 @@ class AgoraService {
 
   Future<void> joinChannel({
     required String channelId,
-    required String token, // In prod, fetch from your backend
-    required int uid,      // 0 for auto-assign, or specific ID
+    required String token,
+    required int uid,
   }) async {
-    print('🔴 joining channel: $channelId with uid: $uid');
+    debugPrint('🔴 ========================================');
+    debugPrint('🔴 JOINING AGORA CHANNEL');
+    debugPrint('🔴 Channel ID: "$channelId"');
+    debugPrint('🔴 Requested UID: $uid');
+    debugPrint('🔴 Token: ${token.isEmpty ? "EMPTY (Testing Mode)" : "PROVIDED (${token.length} chars)"}');
+    debugPrint('🔴 ========================================');
+    
     if (!_isInitialized) await initialize();
     
 
-    // Determine local UID
+    // Use UID as provided (0 for auto-assign by Agora)
     _localUid = uid;
-    if (_localUid == 0) {
-      _localUid = DateTime.now().millisecondsSinceEpoch.remainder(100000000);
-    }
+    debugPrint('🔴 Using UID: $_localUid ${uid == 0 ? "(Agora will auto-assign)" : ""}');
 
     try {
       await _engine.enableVideo();
       await _engine.enableAudio();
       await _engine.startPreview(); // Important for web
 
+      debugPrint('🔴 Calling _engine.joinChannel...');
       await _engine.joinChannel(
-        token: token.isEmpty ? '' : token, // Empty token works for testing if "App ID without Certificate" is enabled
+        token: token,
         channelId: channelId,
         uid: _localUid,
         options: const ChannelMediaOptions(
@@ -104,9 +112,10 @@ class AgoraService {
           channelProfile: ChannelProfileType.channelProfileCommunication,
         ),
       );
-      print('🔴 joinChannel called successfully');
+      debugPrint('🔴 ✅ joinChannel completed successfully');
+      debugPrint('🔴 Waiting for onJoinChannelSuccess callback...');
     } catch (e) {
-      print('🔴 Error joining channel: $e');
+      debugPrint('🔴 ❌ Error joining channel: $e');
     }
   }
 
@@ -117,7 +126,19 @@ class AgoraService {
       await _engine.leaveChannel();
       await _engine.stopPreview(); // Turn off camera light
     } catch (e) {
-      print('⚠️ Error leaving channel/stopping preview: $e');
+      debugPrint('⚠️ Error leaving channel/stopping preview: $e');
+    }
+  }
+
+  Future<void> renewToken(String token) async {
+    if (!_isInitialized) return;
+    try {
+      debugPrint('🔄 Renewing Agora token...');
+      await _engine.renewToken(token);
+      debugPrint('✅ Token renewed successfully');
+    } catch (e) {
+      debugPrint('❌ Error renewing token: $e');
+      rethrow;
     }
   }
 

@@ -15,6 +15,8 @@ class ProfileModel {
   final bool isOnline;
   final int coins;
   final int diamonds;
+  final int freeMessagesCount;
+  final DateTime? lastCheckIn;
   final String lookingFor;
   final double? latitude;
   final double? longitude;
@@ -40,6 +42,8 @@ class ProfileModel {
     this.isOnline = false,
     this.coins = 0,
     this.diamonds = 0,
+    this.freeMessagesCount = 0,
+    this.lastCheckIn,
     this.lookingFor = '',
     this.latitude,
     this.longitude,
@@ -67,6 +71,8 @@ class ProfileModel {
       isOnline: map['is_online'] ?? false,
       coins: map['coins'] ?? 0,
       diamonds: map['diamonds'] ?? 0,
+      freeMessagesCount: map['free_messages_count'] ?? 0,
+      lastCheckIn: map['last_check_in'] != null ? DateTime.parse(map['last_check_in']) : null,
       lookingFor: map['looking_for'] ?? '',
       latitude: map['latitude'] != null ? (map['latitude'] as num).toDouble() : null,
       longitude: map['longitude'] != null ? (map['longitude'] as num).toDouble() : null,
