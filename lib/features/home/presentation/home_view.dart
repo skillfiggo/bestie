@@ -14,9 +14,9 @@ import 'package:bestie/features/profile/presentation/screens/user_profile_screen
 import 'package:bestie/features/auth/data/providers/auth_providers.dart';
 import 'package:bestie/features/chat/data/repositories/call_repository.dart';
 import 'package:permission_handler/permission_handler.dart';
-
 import 'package:bestie/features/admin/data/repositories/admin_repository.dart';
 import 'package:bestie/features/home/presentation/widgets/search_user_delegate.dart';
+import 'package:bestie/core/services/connectivity_service.dart';
 
 class HomeView extends ConsumerStatefulWidget {
   const HomeView({super.key});
@@ -162,7 +162,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString();
+          _error = ConnectivityService.getNetworkErrorMessage(e);
           _isLoading = false;
         });
       }
