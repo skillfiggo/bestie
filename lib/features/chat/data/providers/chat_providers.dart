@@ -9,12 +9,12 @@ import 'package:bestie/core/services/supabase_service.dart';
 part 'chat_providers.g.dart';
 
 @riverpod
-ChatRepository chatRepository(ChatRepositoryRef ref) {
+ChatRepository chatRepository(Ref ref) {
   return ChatRepository();
 }
 
 @riverpod
-Stream<List<ChatModel>> chatList(ChatListRef ref) async* {
+Stream<List<ChatModel>> chatList(Ref ref) async* {
   // Polling or Realtime subscription could be used here for the list itself
   // For simplicity, we'll fetch once then maybe poll or rely on manual refresh for now
   // Or, since we want realtime, we should ideally listen to 'chats' table changes too.
@@ -30,13 +30,13 @@ Stream<List<ChatModel>> chatList(ChatListRef ref) async* {
 }
 
 @riverpod
-Stream<List<Message>> chatMessages(ChatMessagesRef ref, String chatId) {
+Stream<List<Message>> chatMessages(Ref ref, String chatId) {
   final repository = ref.watch(chatRepositoryProvider);
   return repository.messagesStream(chatId);
 }
 
 @riverpod
-Future<List<CallHistoryModel>> callHistoryList(CallHistoryListRef ref) async {
+Future<List<CallHistoryModel>> callHistoryList(Ref ref) async {
   final repository = ref.watch(callRepositoryProvider);
   final currentUserId = SupabaseService.client.auth.currentUser?.id;
   
@@ -52,5 +52,8 @@ Future<List<CallHistoryModel>> callHistoryList(CallHistoryListRef ref) async {
 // Simple state provider to track current chat
 final currentChatIdProvider = StateProvider<String?>((ref) => null);
 
-// Provider to track total unread messages count
-final totalUnreadMessagesProvider = StateProvider<int>((ref) => 0);
+// Provider to track total unread messages count derived from chat list
+final totalUnreadMessagesProvider = Provider<int>((ref) {
+  final chats = ref.watch(chatListProvider).value ?? [];
+  return chats.fold(0, (sum, chat) => sum + chat.unreadCount);
+});

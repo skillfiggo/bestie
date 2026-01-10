@@ -115,8 +115,9 @@ class MessageBubble extends StatelessWidget {
     // Check for standard call log patterns
     final bool isCallStart = content.contains('Started a') && content.contains('call') && content.contains('[call_id:');
     final bool isCallMissed = content.contains('Missed') && content.contains('call');
+    final bool isCallEnded = content.contains('Ended a') && content.contains('call');
     
-    if (isCallStart || isCallMissed) {
+    if (isCallStart || isCallMissed || isCallEnded) {
        final isVideo = content.toLowerCase().contains('video');
        
        return Row(
@@ -131,7 +132,7 @@ class MessageBubble extends StatelessWidget {
              child: Icon(
                isCallMissed 
                  ? (isVideo ? Icons.videocam_off_rounded : Icons.phone_missed_rounded)
-                 : (isVideo ? Icons.videocam_rounded : Icons.phone_rounded),
+                 : (isCallEnded ? (isVideo ? Icons.videocam_rounded : Icons.phone_callback_rounded) : (isVideo ? Icons.videocam_rounded : Icons.phone_rounded)),
                color: isMe ? Colors.white : AppColors.textPrimary,
                size: 20,
              ),
@@ -143,16 +144,18 @@ class MessageBubble extends StatelessWidget {
                Text(
                  isCallMissed 
                    ? (isVideo ? 'Missed Video Call' : 'Missed Voice Call')
-                   : (isVideo ? 'Video Call' : 'Voice Call'),
+                   : (isCallEnded ? (isVideo ? 'Video Call Ended' : 'Voice Call Ended') : (isVideo ? 'Video Call' : 'Voice Call')),
                  style: TextStyle(
                    color: isMe ? Colors.white : AppColors.textPrimary,
                    fontSize: 16,
                    fontWeight: FontWeight.bold,
                  ),
                ),
-               if (isCallStart)
+               if (isCallStart || isCallEnded)
                  Text(
-                   'Tap for details', // Placeholder or just hide ID
+                   isCallEnded 
+                     ? content.split('Duration: ').last // Show "05:23"
+                     : 'Tap for details', 
                    style: TextStyle(
                      color: isMe ? Colors.white70 : Colors.black54,
                      fontSize: 10,

@@ -217,7 +217,7 @@ class _UserListItem extends StatelessWidget {
                       width: 14,
                       height: 14,
                       decoration: BoxDecoration(
-                        color: Colors.green,
+                        color: AppColors.success,
                         shape: BoxShape.circle,
                         border: Border.all(color: Colors.white, width: 2),
                       ),

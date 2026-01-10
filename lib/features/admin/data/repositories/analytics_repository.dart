@@ -8,11 +8,10 @@ final analyticsRepositoryProvider = Provider((ref) => AnalyticsRepository());
 class AnalyticsRepository {
   final SupabaseClient _client = SupabaseService.client;
 
-  /// Get total user count
   Future<int> getTotalUsers() async {
     try {
-      final response = await _client.from('profiles').select();
-      return (response as List).length;
+      final response = await _client.from('profiles').select().count(CountOption.exact);
+      return response.count;
     } catch (e) {
       debugPrint('Error fetching total users: $e');
       return 0;
@@ -61,17 +60,17 @@ class AnalyticsRepository {
     }
   }
 
-  /// Get new users today
   Future<int> getNewUsersToday() async {
     try {
-      final today = DateTime.now();
-      final startOfDay = DateTime(today.year, today.month, today.day);
+      final now = DateTime.now().toUtc();
+      final startOfDay = DateTime.utc(now.year, now.month, now.day);
       
       final response = await _client
           .from('profiles')
           .select()
-          .gte('created_at', startOfDay.toIso8601String());
-      return (response as List).length;
+          .gte('created_at', startOfDay.toIso8601String())
+          .count(CountOption.exact);
+      return response.count;
     } catch (e) {
       debugPrint('Error fetching new users today: $e');
       return 0;
@@ -161,26 +160,26 @@ class AnalyticsRepository {
     }
   }
 
-  /// Get user growth data for the last 7 days
   Future<List<Map<String, dynamic>>> getUserGrowthData() async {
     try {
       final List<Map<String, dynamic>> growthData = [];
-      final now = DateTime.now();
+      final now = DateTime.now().toUtc();
 
       for (int i = 6; i >= 0; i--) {
         final date = now.subtract(Duration(days: i));
-        final startOfDay = DateTime(date.year, date.month, date.day);
+        final startOfDay = DateTime.utc(date.year, date.month, date.day);
         final endOfDay = startOfDay.add(const Duration(days: 1));
 
         final response = await _client
             .from('profiles')
             .select()
             .gte('created_at', startOfDay.toIso8601String())
-            .lt('created_at', endOfDay.toIso8601String());
+            .lt('created_at', endOfDay.toIso8601String())
+            .count(CountOption.exact);
 
         growthData.add({
           'date': startOfDay,
-          'count': (response as List).length,
+          'count': response.count,
         });
       }
 

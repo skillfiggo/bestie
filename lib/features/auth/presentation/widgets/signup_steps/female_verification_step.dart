@@ -72,7 +72,36 @@ class _FemaleVerificationStepState extends ConsumerState<FemaleVerificationStep>
             ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 40),
+          const SizedBox(height: 32),
+          
+          // Instructions Section
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.primary.withValues(alpha: 0.1)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Photo Guidelines:',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _buildInstructionRow(Icons.face_retouching_natural_rounded, 'Your face must be clearly visible'),
+                _buildInstructionRow(Icons.light_mode_rounded, 'Ensure the room is well-lit (no dark photos)'),
+                _buildInstructionRow(Icons.person_off_rounded, 'No photos of children or underage individuals'),
+                _buildInstructionRow(Icons.group_off_rounded, 'Upload a solo photo (no group shots)'),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
           
           // Photo Placeholder
           GestureDetector(
@@ -123,14 +152,53 @@ class _FemaleVerificationStepState extends ConsumerState<FemaleVerificationStep>
                 ),
               ),
               child: widget.isLoading
-                  ? const CircularProgressIndicator(color: Colors.white)
+                  ? Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: const [
+                        SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        ),
+                        SizedBox(width: 12),
+                        Text(
+                          'Uploading...',
+                          style: TextStyle(fontSize: 18, color: Colors.white),
+                        ),
+                      ],
+                    )
                   : const Text(
                       'Verify & Continue',
-                      style: TextStyle(fontSize: 18, color: Colors.white),
+                      style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
                     ),
             ),
           ),
           const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInstructionRow(IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: AppColors.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
         ],
       ),
     );

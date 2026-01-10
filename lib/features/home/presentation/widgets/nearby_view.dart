@@ -11,15 +11,17 @@ import 'package:bestie/features/chat/presentation/screens/chat_detail_screen.dar
 import 'package:bestie/features/calling/presentation/screens/call_screen.dart';
 import 'package:bestie/features/chat/data/repositories/call_repository.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:bestie/features/auth/data/providers/auth_providers.dart';
 
-class NearbyView extends StatefulWidget {
+class NearbyView extends ConsumerStatefulWidget {
   const NearbyView({super.key});
 
   @override
-  State<NearbyView> createState() => _NearbyViewState();
+  ConsumerState<NearbyView> createState() => _NearbyViewState();
 }
 
-class _NearbyViewState extends State<NearbyView> {
+class _NearbyViewState extends ConsumerState<NearbyView> {
   final _repository = NearbyRepository(SupabaseService.client);
   List<ProfileModel> _nearbyProfiles = [];
   bool _isLoading = true;
@@ -193,9 +195,22 @@ class _NearbyViewState extends State<NearbyView> {
     if (_currentPosition == null) return;
 
     try {
+      // Get current user gender to filter by opposite
+      final userProfile = await ref.read(userProfileProvider.future);
+      String? targetGender;
+      
+      if (userProfile != null) {
+        if (userProfile.gender == 'male') {
+          targetGender = 'female';
+        } else if (userProfile.gender == 'female') {
+          targetGender = 'male';
+        }
+      }
+
       final profiles = await _repository.getNearbyProfiles(
         latitude: _currentPosition!.latitude,
         longitude: _currentPosition!.longitude,
+        targetGender: targetGender,
         radiusKm: 50, // Default 50km radius
       );
       if (mounted) {

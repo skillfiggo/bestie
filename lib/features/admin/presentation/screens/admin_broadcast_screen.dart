@@ -51,7 +51,7 @@ class _AdminBroadcastScreenState extends ConsumerState<AdminBroadcastScreen> {
 
     await showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('New Broadcast'),
         scrollable: true,
         content: Column(
@@ -104,13 +104,13 @@ class _AdminBroadcastScreenState extends ConsumerState<AdminBroadcastScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () async {
               if (titleController.text.isNotEmpty && messageController.text.isNotEmpty) {
-                Navigator.pop(context);
+                Navigator.pop(dialogContext);
                 try {
                   await ref.read(adminRepositoryProvider).createBroadcast(
                         title: titleController.text.trim(),

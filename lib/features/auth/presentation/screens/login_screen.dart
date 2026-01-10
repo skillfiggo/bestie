@@ -6,13 +6,16 @@ import 'package:bestie/features/auth/presentation/widgets/auth_button.dart';
 import 'package:bestie/features/auth/data/providers/auth_providers.dart';
 import 'package:bestie/app/router.dart';
 import 'package:bestie/features/auth/presentation/screens/verification_screen.dart';
+import 'package:bestie/features/auth/presentation/screens/forgot_password_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   final VoidCallback onSwitchToSignup;
+  final String? initialEmail;
 
   const LoginScreen({
     super.key,
     required this.onSwitchToSignup,
+    this.initialEmail,
   });
 
   @override
@@ -24,6 +27,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialEmail != null) {
+      _emailController.text = widget.initialEmail!;
+    }
+  }
+
+  @override
+  void didUpdateWidget(LoginScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialEmail != null && widget.initialEmail != oldWidget.initialEmail) {
+      _emailController.text = widget.initialEmail!;
+    }
+  }
 
   @override
   void dispose() {
@@ -59,6 +78,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
+      
+      // Only navigate if sign-in was successful (no error)
+      if (mounted) {
+        final authState = ref.read(authControllerProvider);
+        authState.whenOrNull(
+          data: (_) {
+            // Sign-in successful, navigate to main shell
+            Navigator.pushNamedAndRemoveUntil(context, AppRouter.mainShell, (route) => false);
+          },
+          // Errors are already handled by the listener above
+        );
+      }
     }
   }
 
@@ -70,11 +101,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       (previous, next) {
         next.whenOrNull(
           data: (_) {
-            Navigator.pushNamedAndRemoveUntil(
-              context, 
-              AppRouter.mainShell,
-              (route) => false,
-            );
+            // Navigation used to be here, but it triggers on ANY success (like sendOtp).
+            // We now handle navigation inside _handleLogin or via a more specific state.
           },
           error: (error, stackTrace) {
             // Format error message
@@ -186,7 +214,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 TextButton(
                   onPressed: () {
-                    // TODO: Implement forgot password
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ForgotPasswordScreen(),
+                      ),
+                    );
                   },
                   child: const Text(
                     'Forgot Password?',
@@ -255,16 +288,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             _SocialLoginButton(
               icon: Icons.g_mobiledata_rounded,
               text: 'Continue with Google',
-              onPressed: () {
-                // TODO: Implement Google sign in
-              },
-            ),
-            const SizedBox(height: 12),
-            _SocialLoginButton(
-              icon: Icons.apple,
-              text: 'Continue with Apple',
-              onPressed: () {
-                // TODO: Implement Apple sign in
+              onPressed: isLoading ? () {} : () {
+                ref.read(authControllerProvider.notifier).signInWithGoogle();
               },
             ),
             const SizedBox(height: 32),

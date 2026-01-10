@@ -78,9 +78,11 @@ class _ChatInputFieldState extends State<ChatInputField> {
       if (!await _audioRecorder.hasPermission()) {
         final status = await Permission.microphone.request();
         if (status != PermissionStatus.granted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Microphone permission is required')),
-          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Microphone permission is required')),
+            );
+          }
           return;
         }
       }
@@ -112,9 +114,11 @@ class _ChatInputFieldState extends State<ChatInputField> {
       
     } catch (e) {
       debugPrint('❌ Error starting recording: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Recording failed: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Recording failed: $e')),
+        );
+      }
     }
   }
 
@@ -142,16 +146,20 @@ class _ChatInputFieldState extends State<ChatInputField> {
       final file = File(path);
       if (await file.exists() && await file.length() > 0) {
          if (duration < 1) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Voice note too short')),
-            );
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Voice note too short')),
+              );
+            }
             return;
          }
          widget.onSendVoiceNote!(path, duration);
       } else {
-         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Failed to record voice note')),
-         );
+         if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Failed to record voice note')),
+            );
+         }
       }
     }
   }

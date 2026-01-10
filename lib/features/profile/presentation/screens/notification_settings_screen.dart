@@ -52,8 +52,7 @@ class NotificationSettingsScreen extends ConsumerWidget {
     final callRingtone = ref.watch(callRingtoneProvider);
     final callVibration = ref.watch(callVibrationProvider);
 
-    final appUpdates = ref.watch(appUpdatesNotificationProvider);
-    final promotions = ref.watch(promotionsNotificationProvider);
+
 
     final doNotDisturb = ref.watch(doNotDisturbProvider);
     final dndStartTime = ref.watch(dndStartTimeProvider);

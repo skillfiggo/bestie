@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:bestie/core/constants/app_colors.dart';
 import 'package:bestie/features/auth/data/providers/auth_providers.dart';
@@ -7,12 +8,37 @@ import 'package:bestie/app/router.dart';
 import 'package:bestie/features/profile/presentation/screens/edit_profile_screen.dart';
 import 'package:bestie/features/profile/presentation/screens/privacy_settings_screen.dart';
 import 'package:bestie/features/profile/presentation/screens/notification_settings_screen.dart';
+import 'package:bestie/features/profile/presentation/screens/help_center_screen.dart';
+import 'package:bestie/features/profile/presentation/screens/about_app_screen.dart';
 import 'package:bestie/features/admin/presentation/screens/admin_dashboard_screen.dart';
+
+final cacheSizeProvider = FutureProvider.autoDispose<String>((ref) async {
+  try {
+    final cacheDir = await getTemporaryDirectory();
+    if (!cacheDir.existsSync()) return '0 B';
+
+    int totalSize = 0;
+    final entities = await cacheDir.list(recursive: true).toList();
+    for (var entity in entities) {
+      if (entity is File) {
+        totalSize += await entity.length();
+      }
+    }
+
+    if (totalSize < 1024) return '$totalSize B';
+    if (totalSize < 1024 * 1024) return '${(totalSize / 1024).toStringAsFixed(2)} KB';
+    if (totalSize < 1024 * 1024 * 1024) return '${(totalSize / (1024 * 1024)).toStringAsFixed(2)} MB';
+    return '${(totalSize / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
+  } catch (e) {
+    debugPrint('Error calculating cache size: $e');
+    return '0 B';
+  }
+});
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
-  Future<void> _handleClearCache(BuildContext context) async {
+  Future<void> _handleClearCache(BuildContext context, WidgetRef ref) async {
     // Show confirmation dialog
     final shouldClear = await showDialog<bool>(
       context: context,
@@ -56,6 +82,9 @@ class SettingsScreen extends ConsumerWidget {
         if (context.mounted) {
           Navigator.pop(context); // Close loading dialog
           
+          // Invalidate cache size provider to refresh the UI
+          ref.invalidate(cacheSizeProvider);
+
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Cache cleared successfully!'),
@@ -260,7 +289,7 @@ class SettingsScreen extends ConsumerWidget {
               );
             },
             loading: () => const SizedBox.shrink(),
-            error: (_, __) => const SizedBox.shrink(),
+            error: (error, stackTrace) => const SizedBox.shrink(),
           ),
 
           _buildSectionHeader('Account Settings'),
@@ -303,6 +332,14 @@ class SettingsScreen extends ConsumerWidget {
             icon: Icons.help_outline_rounded,
             title: 'Help Center',
             color: Colors.teal,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const HelpCenterScreen(),
+                ),
+              );
+            },
           ),
           _buildSettingsTile(
             context,
@@ -313,13 +350,33 @@ class SettingsScreen extends ConsumerWidget {
               'v1.0.0',
               style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
             ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const AboutAppScreen(),
+                ),
+              );
+            },
           ),
           _buildSettingsTile(
             context,
             icon: Icons.cleaning_services_rounded,
             title: 'Clear Cache',
             color: Colors.blueGrey,
-            onTap: () => _handleClearCache(context),
+            trailing: ref.watch(cacheSizeProvider).when(
+              data: (size) => Text(
+                size,
+                style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+              ),
+              loading: () => const SizedBox(
+                width: 12,
+                height: 12,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              error: (_, __) => const Text('Error', style: TextStyle(color: Colors.red, fontSize: 12)),
+            ),
+            onTap: () => _handleClearCache(context, ref),
           ),
 
           const SizedBox(height: 40),

@@ -59,7 +59,9 @@ class _CommentsSheetState extends ConsumerState<CommentsSheet> {
       // Refresh global feed to update comment counts
       ref.invalidate(momentsProvider);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to post comment: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to post comment: $e')));
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

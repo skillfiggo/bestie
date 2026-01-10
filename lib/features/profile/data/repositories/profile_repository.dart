@@ -43,6 +43,9 @@ class ProfileRepository {
       query = query.lte('age', maxAge);
     }
 
+    // CRITICAL: Unverified female users should not appear in discovery
+    query = query.or('gender.neq.female,is_verified.eq.true');
+
     // Sort by verified first for discovery
     query = query.order('is_verified', ascending: false);
     
@@ -56,7 +59,10 @@ class ProfileRepository {
   }
 
   /// Fetch newly registered users (Newcomers)
-  Future<List<ProfileModel>> getNewcomerProfiles({int limit = 20}) async {
+  Future<List<ProfileModel>> getNewcomerProfiles({
+    String? gender,
+    int limit = 20,
+  }) async {
     final currentUser = _client.auth.currentUser;
     if (currentUser == null) return [];
 
@@ -64,6 +70,14 @@ class ProfileRepository {
     query = query.neq('id', currentUser.id);
     query = query.neq('name', 'Official Team');
     
+    // Apply Gender Filter
+    if (gender != null && gender.isNotEmpty) {
+      query = query.eq('gender', gender);
+    }
+
+    // CRITICAL: Unverified female users should not appear in newcomers
+    query = query.or('gender.neq.female,is_verified.eq.true');
+
     // Sort by creation date (newest first)
     query = query.order('created_at', ascending: false);
     query = query.limit(limit);
@@ -151,6 +165,25 @@ class ProfileRepository {
       return _client.storage.from('avatars').getPublicUrl(path);
     } catch (e) {
       throw Exception('Failed to upload gallery image: $e');
+    }
+  }
+
+  /// Add coins to user profile
+  Future<void> addCoins(String userId, int infoCoins) async {
+    try {
+      // We use rpc to increment coins safely if we had one, but for now we read-then-write or just rely on simple update.
+      // Ideally use a postgres function: 'increment_coins'.
+      // For now, let's fetch current coins and update.
+      
+      final res = await _client.from('profiles').select('coins').eq('id', userId).single();
+      final currentCoins = res['coins'] as int? ?? 0;
+      
+      await _client.from('profiles').update({
+        'coins': currentCoins + infoCoins
+      }).eq('id', userId);
+      
+    } catch (e) {
+       throw Exception('Failed to update coin balance: $e');
     }
   }
 }

@@ -12,7 +12,8 @@ class AuthView extends StatefulWidget {
 class _AuthViewState extends State<AuthView> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
-
+  String? _initialEmail;
+  
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -34,12 +35,20 @@ class _AuthViewState extends State<AuthView> {
     super.dispose();
   }
 
-  void _switchToLogin() {
-    _pageController.animateToPage(
-      0,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-    );
+  void _switchToLogin([String? email]) {
+    setState(() {
+      _initialEmail = email;
+    });
+    // Ensure we switch to the login page
+    Future.delayed(Duration.zero, () {
+      if (_pageController.hasClients) {
+        _pageController.animateToPage(
+          0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+      }
+    });
   }
 
   void _switchToSignup() {
@@ -71,7 +80,10 @@ class _AuthViewState extends State<AuthView> {
                   setState(() => _currentPage = index);
                 },
                 children: [
-                  LoginScreen(onSwitchToSignup: _switchToSignup),
+                  LoginScreen(
+                    onSwitchToSignup: _switchToSignup,
+                    initialEmail: _initialEmail,
+                  ),
                   SignupScreen(onSwitchToLogin: _switchToLogin),
                 ],
               ),

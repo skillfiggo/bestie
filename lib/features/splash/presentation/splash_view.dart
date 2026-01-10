@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:bestie/app/router.dart';
 import 'package:bestie/core/constants/app_colors.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class SplashView extends StatefulWidget {
   const SplashView({super.key});
@@ -112,9 +113,9 @@ class _SplashViewState extends State<SplashView> with SingleTickerProviderStateM
                         const SizedBox(height: 32),
                         
                         // App name
-                        const Text(
+                        Text(
                           'BESTIEE',
-                          style: TextStyle(
+                          style: GoogleFonts.luckiestGuy(
                             fontSize: 48,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,

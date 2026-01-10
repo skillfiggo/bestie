@@ -122,7 +122,7 @@ class ChatView extends ConsumerWidget {
                             ? Text(call.contactName[0].toUpperCase()) 
                             : null,
                       ),
-                      if (call.isOnline)
+                      if (call.isOnline && call.showOnlineStatus)
                         Positioned(
                           bottom: 0,
                           right: 2,
@@ -130,7 +130,7 @@ class ChatView extends ConsumerWidget {
                             width: 14,
                             height: 14,
                             decoration: BoxDecoration(
-                              color: Colors.greenAccent,
+                              color: AppColors.success,
                               shape: BoxShape.circle,
                               border: Border.all(color: Colors.white, width: 2),
                             ),
@@ -237,15 +237,44 @@ class _ChatList extends ConsumerWidget {
             final chat = chats[index];
             return ListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              leading: CircleAvatar(
-                radius: 28,
-                backgroundImage: chat.imageUrl.isNotEmpty ? NetworkImage(chat.imageUrl) : null,
-                child: chat.imageUrl.isEmpty ? Text(chat.name[0]) : null,
+              leading: Stack(
+                children: [
+                  CircleAvatar(
+                    radius: 28,
+                    backgroundColor: chat.isOfficial ? Colors.transparent : null,
+                    backgroundImage: chat.isOfficial 
+                        ? const AssetImage('assets/images/official_team.png') as ImageProvider
+                        : (chat.imageUrl.isNotEmpty ? NetworkImage(chat.imageUrl) : null),
+                    child: (chat.imageUrl.isEmpty && !chat.isOfficial) ? Text(chat.name[0]) : null,
+                  ),
+                  if (chat.isOnline && chat.showOnlineStatus)
+                    Positioned(
+                      bottom: 0,
+                      right: 2,
+                      child: Container(
+                        width: 14,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: AppColors.success,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2),
+                        ),
+                      ),
+                    ),
+                ],
               ),
-              title: Text(
-                chat.name,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textPrimary),
-              ),
+                title: Row(
+                  children: [
+                    Text(
+                      chat.name,
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textPrimary),
+                    ),
+                    if (chat.isOfficial) ...[
+                      const SizedBox(width: 4),
+                      const Icon(Icons.verified, size: 16, color: Colors.blue),
+                    ]
+                  ],
+                ),
               subtitle: Text(
                 chat.lastMessage,
                 maxLines: 1,

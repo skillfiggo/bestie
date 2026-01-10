@@ -1,47 +1,88 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:bestie/core/services/supabase_service.dart';
 
 class AuthRepository {
   final SupabaseClient _client = SupabaseService.client;
 
-  /// Sign up with email and password
-  Future<AuthResponse> signUp({
-    required String email,
-    required String password,
-    required Map<String, dynamic> userData,
-  }) async {
+  /// Check if a user exists by email
+  Future<bool> checkUserExists(String email) async {
     try {
-      final response = await _client.auth.signUp(
-        email: email,
-        password: password,
-        data: userData,
-      );
-
-      // Create profile entry
-      if (response.user != null) {
-        await createProfile(response.user!.id, userData);
-      }
-
-      return response;
+      final response = await _client.rpc('check_user_exists', params: {'p_email': email});
+      return response as bool;
     } catch (e) {
-      throw Exception('Sign up failed: $e');
+      debugPrint('Error checking user existence: $e');
+      // If RPC fails (e.g. not created yet), we fallback to false to allow signup attempt
+      return false;
     }
   }
 
-  /// Verify email OTP
-  Future<AuthResponse> verifyEmailOtp({
+  /// Send OTP to email (for signup or login)
+  Future<void> sendOtp(String email) async {
+    try {
+      debugPrint('Sending OTP to $email...');
+      await _client.auth.signInWithOtp(
+        email: email,
+        shouldCreateUser: true,
+      );
+      debugPrint('OTP sent successfully');
+    } catch (e) {
+      debugPrint('Failed to send OTP: $e');
+      throw Exception('Failed to send verification code: $e');
+    }
+  }
+
+  /// Verify OTP
+  Future<AuthResponse> verifyOtp({
     required String email,
     required String token,
   }) async {
     try {
-      return await _client.auth.verifyOTP(
-        type: OtpType.signup,
+      debugPrint('Verifying OTP for $email with token $token...');
+      // Try magiclink type first
+      final res = await _client.auth.verifyOTP(
+        type: OtpType.magiclink,
         token: token,
         email: email,
       );
+      debugPrint('OTP verified with type magiclink');
+      return res;
     } catch (e) {
-      throw Exception('Verification failed: $e');
+      debugPrint('Magiclink verification failed, trying signup type... Error: $e');
+      try {
+        final res = await _client.auth.verifyOTP(
+          type: OtpType.signup,
+          token: token,
+          email: email,
+        );
+        debugPrint('OTP verified with type signup');
+        return res;
+      } catch (err) {
+         debugPrint('Both OTP types failed. Final error: $err');
+         throw Exception('Verification failed: Invalid or expired code');
+      }
+    }
+  }
+
+
+  /// Verify Recovery OTP (Using Recovery type for Password Reset codes)
+  Future<AuthResponse> verifyRecoveryOtp({
+    required String email,
+    required String token,
+  }) async {
+    try {
+      debugPrint('Verifying reset code for $email...');
+      final res = await _client.auth.verifyOTP(
+        type: OtpType.recovery, // This type matches the 'Password Reset' template
+        token: token,
+        email: email,
+      );
+      return res;
+    } catch (e) {
+      debugPrint('Recovery verification failed: $e');
+      throw Exception('Verification failed: Invalid or expired code');
     }
   }
 
@@ -57,6 +98,57 @@ class AuthRepository {
       );
     } catch (e) {
       throw Exception('Sign in failed: $e');
+    }
+  }
+
+  /// Sign in with Google
+  Future<AuthResponse> signInWithGoogle() async {
+    try {
+      // 1. Initialize GoogleSignIn
+      final webClientId = dotenv.env['GOOGLE_WEB_CLIENT_ID'];
+      final iosClientId = dotenv.env['GOOGLE_IOS_CLIENT_ID'];
+
+      final GoogleSignIn googleSignIn = GoogleSignIn(
+        clientId: iosClientId,
+        serverClientId: webClientId,
+      );
+
+      final googleUser = await googleSignIn.signIn();
+      if (googleUser == null) {
+        throw Exception('Google sign in cancelled');
+      }
+
+      final googleAuth = await googleUser.authentication;
+      final accessToken = googleAuth.accessToken;
+      final idToken = googleAuth.idToken;
+
+      if (idToken == null) {
+        throw Exception('No ID Token found.');
+      }
+
+      final response = await _client.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: idToken,
+        accessToken: accessToken,
+      );
+
+      // 2. Check if profile exists, if not create it
+      if (response.user != null) {
+        final profile = await getProfile(response.user!.id);
+        if (profile == null) {
+          // New user, create profile with Google data
+          await createProfile(response.user!.id, {
+            'name': googleUser.displayName ?? '',
+            'avatar_url': googleUser.photoUrl ?? '',
+            'email': googleUser.email,
+          });
+        }
+      }
+
+      return response;
+    } catch (e) {
+      debugPrint('Google Sign-In Error: $e');
+      throw Exception('Google sign in failed: $e');
     }
   }
 
@@ -79,12 +171,17 @@ class AuthRepository {
     return _client.auth.currentUser != null;
   }
 
-  /// Reset password
+  /// Reset password (Initiates 6-digit code flow)
   Future<void> resetPassword(String email) async {
     try {
-      await _client.auth.resetPasswordForEmail(email);
+      await _client.auth.signInWithOtp(
+        email: email,
+        emailRedirectTo: null,
+        shouldCreateUser: false,
+        data: {'type': 'recovery'},
+      );
     } catch (e) {
-      throw Exception('Password reset failed: $e');
+      throw Exception('Failed to send reset code. Please check your email and try again.');
     }
   }
 
@@ -145,12 +242,23 @@ class AuthRepository {
     }
   }
 
+  Future<void> updateLastActive(String userId) async {
+    try {
+      await _client.from('profiles').update({
+        'last_active_at': DateTime.now().toUtc().toIso8601String(),
+        'is_online': true, // Also ensure is_online is true while active
+      }).eq('id', userId);
+    } catch (e) {
+      debugPrint('Failed to update last active: $e');
+    }
+  }
+
   Future<void> createProfile(String userId, Map<String, dynamic> userData) async {
     final profileData = {
       'id': userId,
-      'name': userData['name'] ?? '',
+      'name': userData['name'] ?? 'New User',
       'age': userData['age'] ?? 18,
-      'gender': userData['gender'] ?? '',
+      'gender': userData['gender'] ?? 'other', // Fix: Avoid empty string which violates DB constraint
       'bio': userData['bio'] ?? '',
       'location': userData['location'] ?? '',
       'occupation': userData['occupation'] ?? '',
@@ -163,11 +271,13 @@ class AuthRepository {
       'coins': 240,
       'diamonds': 0,
       'role': 'user',
-      'status': 'active',
-      'free_messages_count': 0,
+      'status': userData['status'] ?? 'pending_profile', // Default changed to pending_profile
       'free_messages_count': 0,
       'last_check_in': null,
-      'bestie_id': _generateBestieId(),
+      'bestie_id': userData['bestie_id'] ?? _generateBestieId(),
+      'show_online_status': true,
+      'show_last_seen': true,
+      'last_active_at': DateTime.now().toUtc().toIso8601String(),
     };
 
     try {
@@ -175,8 +285,6 @@ class AuthRepository {
       await _client.from('profiles').upsert(profileData);
     } catch (e) {
       debugPrint('Profile creation/update failed: $e');
-      // If it fails, it might be due to a specific constraint or trigger issue.
-      // But for now, we want to see the real error if it persists.
       throw Exception('Failed to initialize profile: $e');
     }
   }
@@ -245,7 +353,6 @@ class AuthRepository {
 
   /// Helper to generate a random 8-char alphanumeric ID
   String _generateBestieId() {
-    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
     final random = DateTime.now().millisecondsSinceEpoch.toString();
     // Simple pseudo-random strategy combined with timestamp parts
     // Ideally use uuid or random, but for short ID:

@@ -6,12 +6,14 @@ import 'package:bestie/core/constants/app_colors.dart';
 import 'package:bestie/features/auth/data/providers/auth_providers.dart';
 import 'package:bestie/features/chat/data/providers/chat_providers.dart';
 import 'package:bestie/features/chat/presentation/screens/chat_detail_screen.dart';
+import 'package:bestie/features/home/domain/models/profile_model.dart';
 import 'package:bestie/features/calling/presentation/screens/call_screen.dart';
 import 'package:bestie/features/social/data/providers/follow_providers.dart';
 import 'package:bestie/features/moment/presentation/widgets/moment_card.dart';
 import 'package:bestie/features/moment/data/providers/moment_providers.dart';
 import 'package:bestie/features/profile/data/providers/profile_visit_providers.dart';
 import 'package:bestie/features/admin/data/repositories/admin_repository.dart';
+import 'package:bestie/features/chat/data/repositories/call_repository.dart';
 
 import 'package:bestie/features/admin/presentation/widgets/report_dialog.dart';
 import 'package:bestie/features/admin/data/repositories/reports_repository.dart';
@@ -124,7 +126,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                       );
                     },
                     loading: () => const SizedBox.shrink(),
-                    error: (_, __) => const SizedBox.shrink(),
+                    error: (error, stackTrace) => const SizedBox.shrink(),
                   ),
                 ],
                 title: Text(
@@ -153,9 +155,9 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                             child: Stack(
                               clipBehavior: Clip.none,
                               children: [
-                                // Cover Photo
+                                // Cover Photo with Gradient Overlay
                                 Container(
-                                  height: 150,
+                                  height: 180, // Taller cover
                                   decoration: BoxDecoration(
                                     image: DecorationImage(
                                       image: profile.coverPhotoUrl.isNotEmpty
@@ -167,6 +169,20 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                                     ),
                                     color: Colors.grey.shade300,
                                   ),
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topCenter,
+                                        end: Alignment.bottomCenter,
+                                        colors: [
+                                          Colors.black.withValues(alpha: 0.3),
+                                          Colors.transparent,
+                                          Colors.transparent,
+                                          Colors.white.withValues(alpha: 0.8),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
                                 ),
                                 // Profile Avatar
                                 Positioned(
@@ -176,33 +192,39 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                                     decoration: BoxDecoration(
                                       border: Border.all(color: Colors.white, width: 4),
                                       shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: 0.1),
+                                          blurRadius: 10,
+                                          offset: const Offset(0, 4),
+                                        ),
+                                      ],
                                     ),
                                     child: CircleAvatar(
-                                      radius: 50,
+                                      radius: 55, // Slightly larger
                                       backgroundImage: profile.avatarUrl.isNotEmpty
                                           ? NetworkImage(profile.avatarUrl)
                                           : null,
                                       child: profile.avatarUrl.isEmpty
                                           ? Text(
                                               profile.name.isNotEmpty ? profile.name[0] : '?',
-                                              style: const TextStyle(fontSize: 30),
+                                              style: const TextStyle(fontSize: 34),
                                             )
                                           : null,
                                     ),
                                   ),
                                 ),
-                                // Online Indicator
-                                if (profile.isOnline)
+                                if (profile.isOnline && profile.showOnlineStatus)
                                   Positioned(
-                                    bottom: 5,
-                                    left: 95,
+                                    bottom: 8,
+                                    left: 100,
                                     child: Container(
-                                      width: 20,
-                                      height: 20,
+                                      width: 14,
+                                      height: 14,
                                       decoration: BoxDecoration(
-                                        color: Colors.greenAccent,
+                                        color: AppColors.success,
                                         shape: BoxShape.circle,
-                                        border: Border.all(color: Colors.white, width: 3),
+                                        border: Border.all(color: Colors.white, width: 2),
                                       ),
                                     ),
                                   ),
@@ -235,27 +257,10 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                                             ),
                                           ),
                                           const SizedBox(width: 6),
-                                          if (profile.isVerified)
+                                          if (profile.isVerified) ...[
+                                            const SizedBox(width: 6),
                                             const Icon(Icons.verified, color: Colors.blue, size: 20),
-                                          const SizedBox(width: 6),
-                                          Container(
-                                            padding: const EdgeInsets.all(4),
-                                            decoration: BoxDecoration(
-                                              color: profile.gender.toLowerCase() == 'female'
-                                                  ? Colors.pink.shade50
-                                                  : Colors.blue.shade50,
-                                              borderRadius: BorderRadius.circular(6),
-                                            ),
-                                            child: Icon(
-                                              profile.gender.toLowerCase() == 'female'
-                                                  ? Icons.female
-                                                  : Icons.male,
-                                              color: profile.gender.toLowerCase() == 'female'
-                                                  ? Colors.pink
-                                                  : Colors.blue.shade700,
-                                              size: 18,
-                                            ),
-                                          ),
+                                          ],
                                         ],
                                       ),
                                     ),
@@ -268,152 +273,180 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                                       const SnackBar(content: Text('ID copied to clipboard')),
                                     );
                                   },
-                                  child: Row(
-                                    children: [
-                                      Text(
-                                        'ID: ${profile.bestieId.isNotEmpty ? profile.bestieId : profile.id.substring(0, 8)}',
-                                        style: const TextStyle(
-                                          color: Colors.grey,
-                                          fontSize: 13,
-                                        ),
+                                child: Row(
+                                  children: [
+                                    Text(
+                                      'ID: ${profile.bestieId.isNotEmpty ? profile.bestieId : profile.id.substring(0, 8)}',
+                                      style: const TextStyle(
+                                        color: Colors.grey,
+                                        fontSize: 13,
                                       ),
-                                      const SizedBox(width: 4),
-                                      const FaIcon(FontAwesomeIcons.copy, size: 14, color: Colors.grey),
-                                    ],
-                                  ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    const FaIcon(FontAwesomeIcons.copy, size: 14, color: Colors.grey),
+                                  ],
                                 ),
-                                const SizedBox(height: 12),
-                                // Stats Row
+                              ),
+                              const SizedBox(height: 12),
+                              // Location Row (only show if location is set)
+                              if (profile.locationName.isNotEmpty) ...[ 
                                 Row(
                                   children: [
-                                    Consumer(
-                                      builder: (context, ref, child) {
-                                        final followerCountAsync = ref.watch(followerCountProvider(widget.userId));
-                                        return followerCountAsync.when(
-                                          data: (count) => _buildStat(count.toString(), 'Followers'),
-                                          loading: () => _buildStat('...', 'Followers'),
-                                          error: (_, __) => _buildStat('0', 'Followers'),
-                                        );
-                                      },
+                                    Icon(Icons.location_on_rounded, size: 14, color: Colors.grey.shade400),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      profile.locationName,
+                                      style: TextStyle(
+                                        color: Colors.grey.shade600,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                     ),
-                                    const SizedBox(width: 24),
-                                    Consumer(
-                                      builder: (context, ref, child) {
-                                        final followingCountAsync = ref.watch(followingCountProvider(widget.userId));
-                                        return followingCountAsync.when(
-                                          data: (count) => _buildStat(count.toString(), 'Following'),
-                                          loading: () => _buildStat('...', 'Following'),
-                                          error: (_, __) => _buildStat('0', 'Following'),
-                                        );
-                                      },
-                                    ),
-                                    const SizedBox(width: 24),
-                                    _buildStat('0', 'Friends'), // TODO: Implement friends count
-                                    const SizedBox(width: 24),
-                                    _buildStat('0', 'Bestie'), // TODO: Implement bestie count
                                   ],
                                 ),
                                 const SizedBox(height: 16),
-                                // Follow/Unfollow and Bestie Buttons Row
+                              ],
+                                // Stats Row with better spacing
                                 Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    // Follow/Unfollow Button
                                     Expanded(
                                       child: Consumer(
                                         builder: (context, ref, child) {
-                                          final isFollowingAsync = ref.watch(isFollowingProvider(widget.userId));
-                                          
-                                          return isFollowingAsync.when(
-                                            data: (isFollowing) {
-                                              return ElevatedButton.icon(
-                                                onPressed: () async {
-                                                  try {
-                                                    final repository = ref.read(followRepositoryProvider);
-                                                    
-                                                    if (isFollowing) {
-                                                      await repository.unfollowUser(widget.userId);
-                                                    } else {
-                                                      await repository.followUser(widget.userId);
-                                                    }
-                                                    
-                                                    // Refresh the follow status
-                                                    ref.invalidate(isFollowingProvider(widget.userId));
-                                                    ref.invalidate(followerCountProvider(widget.userId));
-                                                  } catch (e) {
-                                                    if (context.mounted) {
-                                                      ScaffoldMessenger.of(context).showSnackBar(
-                                                        SnackBar(content: Text('Error: $e')),
-                                                      );
-                                                    }
-                                                  }
-                                                },
-                                                icon: Icon(
-                                                  isFollowing ? Icons.person_remove : Icons.person_add,
-                                                  size: 20,
-                                                ),
-                                                label: Text(
-                                                  isFollowing ? 'Unfollow' : 'Follow',
-                                                  style: const TextStyle(
-                                                    fontSize: 16,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                                style: ElevatedButton.styleFrom(
-                                                  backgroundColor: isFollowing 
-                                                      ? Colors.grey.shade300 
-                                                      : AppColors.primary,
-                                                  foregroundColor: isFollowing 
-                                                      ? AppColors.textPrimary 
-                                                      : Colors.white,
-                                                  padding: const EdgeInsets.symmetric(vertical: 14),
-                                                  shape: RoundedRectangleBorder(
-                                                    borderRadius: BorderRadius.circular(12),
-                                                  ),
-                                                ),
-                                              );
-                                            },
-                                            loading: () => const ElevatedButton(
-                                              onPressed: null,
-                                              child: SizedBox(
-                                                height: 20,
-                                                width: 20,
-                                                child: CircularProgressIndicator(strokeWidth: 2),
-                                              ),
-                                            ),
-                                            error: (_, __) => const SizedBox.shrink(),
+                                          final followerCountAsync = ref.watch(followerCountProvider(widget.userId));
+                                          return followerCountAsync.when(
+                                            data: (count) => _buildStat(count.toString(), 'Followers'),
+                                            loading: () => _buildStat('...', 'Followers'),
+                                            error: (error, stackTrace) => _buildStat('0', 'Followers'),
                                           );
                                         },
                                       ),
                                     ),
-                                    const SizedBox(width: 12),
-                                    // Bestie Button
                                     Expanded(
-                                      child: ElevatedButton.icon(
-                                        onPressed: null, // Disabled
-                                        icon: const Icon(
-                                          Icons.favorite,
-                                          size: 20,
+                                      child: Consumer(
+                                        builder: (context, ref, child) {
+                                          final followingCountAsync = ref.watch(followingCountProvider(widget.userId));
+                                          return followingCountAsync.when(
+                                            data: (count) => _buildStat(count.toString(), 'Following'),
+                                            loading: () => _buildStat('...', 'Following'),
+                                            error: (error, stackTrace) => _buildStat('0', 'Following'),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                    _buildStat('0', 'Friends'),
+                                    const SizedBox(width: 40),
+                                    _buildStat('0', 'Bestie'),
+                                    const Spacer(),
+                                  ],
+                                ),
+                                const SizedBox(height: 12), // Matching spacer in screenshot
+                                // Follow/Unfollow and Bestie Buttons Row
+                                if (profile.role != 'system') ...[
+                                  Row(
+                                    children: [
+                                      // Follow/Unfollow Button
+                                      Expanded(
+                                        child: Consumer(
+                                          builder: (context, ref, child) {
+                                            final isFollowingAsync = ref.watch(isFollowingProvider(widget.userId));
+                                            
+                                            return isFollowingAsync.when(
+                                              data: (isFollowing) {
+                                                return GestureDetector(
+                                                  onTap: () async {
+                                                    try {
+                                                      final repository = ref.read(followRepositoryProvider);
+                                                      if (isFollowing) {
+                                                        await repository.unfollowUser(widget.userId);
+                                                      } else {
+                                                        await repository.followUser(widget.userId);
+                                                      }
+                                                      ref.invalidate(isFollowingProvider(widget.userId));
+                                                      ref.invalidate(followerCountProvider(widget.userId));
+                                                    } catch (e) {
+                                                      if (context.mounted) {
+                                                        ScaffoldMessenger.of(context).showSnackBar(
+                                                          SnackBar(content: Text('Error: $e')),
+                                                        );
+                                                      }
+                                                    }
+                                                  },
+                                                  child: Container(
+                                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                                    decoration: BoxDecoration(
+                                                      color: isFollowing ? Colors.grey.shade100 : AppColors.primary,
+                                                      borderRadius: BorderRadius.circular(16),
+                                                      border: isFollowing ? Border.all(color: Colors.grey.shade300) : null,
+                                                    ),
+                                                    child: Row(
+                                                      mainAxisAlignment: MainAxisAlignment.center,
+                                                      children: [
+                                                        Icon(
+                                                          isFollowing ? Icons.person_remove_rounded : Icons.person_add_rounded,
+                                                          color: isFollowing ? AppColors.textPrimary : Colors.white,
+                                                          size: 20,
+                                                        ),
+                                                        const SizedBox(width: 8),
+                                                        Text(
+                                                          isFollowing ? 'Unfollow' : 'Follow',
+                                                          style: TextStyle(
+                                                            color: isFollowing ? AppColors.textPrimary : Colors.white,
+                                                            fontSize: 16,
+                                                            fontWeight: FontWeight.bold,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                              loading: () => Container(
+                                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.grey.shade100,
+                                                  borderRadius: BorderRadius.circular(16),
+                                                ),
+                                                child: const Center(
+                                                  child: SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                                                ),
+                                              ),
+                                              error: (error, stackTrace) => const SizedBox.shrink(),
+                                            );
+                                          },
                                         ),
-                                        label: const Text(
-                                          'Bestie',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.grey.shade200,
-                                          foregroundColor: Colors.grey.shade500,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      // Bestie Button
+                                      Expanded(
+                                        child: Container(
                                           padding: const EdgeInsets.symmetric(vertical: 14),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(12),
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey.shade100,
+                                            borderRadius: BorderRadius.circular(16),
+                                            border: Border.all(color: Colors.grey.shade300),
+                                          ),
+                                          child: Row(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Icon(Icons.favorite_rounded, color: Colors.grey.shade400, size: 20),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                'Bestie',
+                                                style: TextStyle(
+                                                  color: Colors.grey.shade400,
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                       ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 16),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 16),
+                                ],
                                 // Action Buttons Row
                                 Row(
                                   children: [
@@ -446,90 +479,40 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                                         },
                                       ),
                                     ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: _ActionButton(
-                                        icon: Icons.videocam_rounded,
-                                        label: 'Video',
-                                        color: const Color(0xFF00c853),
-                                        onPressed: () async {
-                                          try {
-                                            final chat = await ref
-                                                .read(chatRepositoryProvider)
-                                                .createOrGetChat(widget.userId);
-
-                                            // Send call notification message
-                                            await ref.read(chatRepositoryProvider).sendMessage(
-                                              chatId: chat.id,
-                                              content: 'Started a video call',
-                                              receiverId: widget.userId,
-                                            );
-
-                                            if (context.mounted) {
-                                              Navigator.push(
-                                                context,
-                                                MaterialPageRoute(
-                                                  builder: (_) => CallScreen(
-                                                    channelId: chat.id,
-                                                    otherUserId: widget.userId,
-                                                    isVideo: true,
-                                                    isInitiator: true, // This user is starting the call
-                                                  ),
-                                                ),
-                                              );
+                                    if (profile.role != 'system') ...[
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: _ActionButton(
+                                          icon: Icons.videocam_rounded,
+                                          label: 'Video',
+                                          color: const Color(0xFF00c853),
+                                          onPressed: () {
+                                            final currentGender = ref.read(userProfileProvider).value?.gender ?? 'male';
+                                            if (currentGender == 'female') {
+                                              _startCall(isVideo: true);
+                                            } else {
+                                              _showCallCostDialog(context, isVideo: true);
                                             }
-                                          } catch (e) {
-                                            if (context.mounted) {
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                SnackBar(content: Text('Error: $e')),
-                                              );
-                                            }
-                                          }
-                                        },
+                                          },
+                                        ),
                                       ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: _ActionButton(
-                                        icon: Icons.phone_rounded,
-                                        label: 'Call',
-                                        color: const Color(0xFF00c853),
-                                        onPressed: () async {
-                                          try {
-                                            final chat = await ref
-                                                .read(chatRepositoryProvider)
-                                                .createOrGetChat(widget.userId);
-
-                                            // Send call notification message
-                                            await ref.read(chatRepositoryProvider).sendMessage(
-                                              chatId: chat.id,
-                                              content: 'Started a voice call',
-                                              receiverId: widget.userId,
-                                            );
-
-                                            if (context.mounted) {
-                                              Navigator.push(
-                                                context,
-                                                MaterialPageRoute(
-                                                  builder: (_) => CallScreen(
-                                                    channelId: chat.id,
-                                                    otherUserId: widget.userId,
-                                                    isVideo: false,
-                                                    isInitiator: true, // This user is starting the call
-                                                  ),
-                                                ),
-                                              );
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: _ActionButton(
+                                          icon: Icons.phone_rounded,
+                                          label: 'Call',
+                                          color: const Color(0xFF00c853),
+                                          onPressed: () {
+                                            final currentGender = ref.read(userProfileProvider).value?.gender ?? 'male';
+                                            if (currentGender == 'female') {
+                                              _startCall(isVideo: false);
+                                            } else {
+                                              _showCallCostDialog(context, isVideo: false);
                                             }
-                                          } catch (e) {
-                                            if (context.mounted) {
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                SnackBar(content: Text('Error: $e')),
-                                              );
-                                            }
-                                          }
-                                        },
+                                          },
+                                        ),
                                       ),
-                                    ),
+                                    ],
                                   ],
                                 ),
                               ],
@@ -564,15 +547,18 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
             ];
           },
           body: profileAsync.when(
-            data: (profile) => TabBarView(
-              children: [
-                _buildAboutTab(profile),
-                _buildMomentsTab(ref, widget.userId),
-                const Center(child: Text('Gallery Content')),
-              ],
-            ),
+            data: (profile) {
+              if (profile == null) return const Center(child: Text('Profile not found'));
+              return TabBarView(
+                children: [
+                  _buildAboutTab(profile),
+                  _buildMomentsTab(ref, widget.userId),
+                  _buildGalleryTab(profile),
+                ],
+              );
+            },
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, __) => const Center(child: Text('Error loading profile content')),
+            error: (error, stackTrace) => const Center(child: Text('Error loading profile content')),
           ),
         ),
       ),
@@ -606,7 +592,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     );
   }
 
-  Widget _buildAboutTab(profile) {
+  Widget _buildAboutTab(ProfileModel? profile) {
     if (profile == null) return const SizedBox.shrink();
 
     return SingleChildScrollView(
@@ -762,11 +748,89 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                   );
                 },
                 loading: () => const SizedBox.shrink(),
-                error: (_, __) => const SizedBox.shrink(),
+                error: (error, stackTrace) => const SizedBox.shrink(),
               );
             },
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildGalleryTab(ProfileModel profile) {
+    if (profile.galleryUrls.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.photo_library_outlined, size: 64, color: Colors.grey),
+            SizedBox(height: 16),
+            Text(
+              'No gallery images yet',
+              style: TextStyle(color: Colors.grey, fontSize: 16),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return GridView.builder(
+      padding: const EdgeInsets.all(12),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+        childAspectRatio: 1,
+      ),
+      itemCount: profile.galleryUrls.length,
+      itemBuilder: (context, index) {
+        final url = profile.galleryUrls[index];
+        return GestureDetector(
+          onTap: () => _showFullScreenImage(context, url),
+          child: Hero(
+            tag: url,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.network(
+                url,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  color: Colors.grey.shade200,
+                  child: const Icon(Icons.error_outline, color: Colors.grey),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showFullScreenImage(BuildContext context, String imageUrl) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => Scaffold(
+          backgroundColor: Colors.black,
+          appBar: AppBar(
+            backgroundColor: Colors.black,
+            iconTheme: const IconThemeData(color: Colors.white),
+            elevation: 0,
+          ),
+          body: Center(
+            child: InteractiveViewer(
+              child: Hero(
+                tag: imageUrl,
+                child: Image.network(
+                  imageUrl,
+                  fit: BoxFit.contain,
+                  width: double.infinity,
+                  height: double.infinity,
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -811,6 +875,174 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
       ],
     );
   }
+
+  void _showCallCostDialog(BuildContext context, {required bool isVideo}) {
+    final int cost = isVideo ? 200 : 100;
+    final String type = isVideo ? 'Video Call' : 'Voice Call';
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: Colors.white,
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+                                Container(
+                                  padding: const EdgeInsets.all(20),
+                                  decoration: BoxDecoration(
+                                    color: isVideo ? Colors.green.shade50 : Colors.blue.shade50,
+                                    borderRadius: BorderRadius.circular(30),
+                                  ),
+                                  child: Icon(
+                                    isVideo ? Icons.videocam_rounded : Icons.phone_rounded,
+                                    color: isVideo ? Colors.green : Colors.blue,
+                                    size: 48,
+                                  ),
+                                ),
+                                const SizedBox(height: 24),
+                                Text(
+                                  'Ready for a $type?',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.textPrimary,
+                                    letterSpacing: -0.5,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange.shade50,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(color: Colors.orange.shade100),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.monetization_on_rounded, color: Colors.orange, size: 20),
+                                      const SizedBox(width: 8),
+                                      RichText(
+                                        text: TextSpan(
+                                          style: const TextStyle(fontSize: 15, color: AppColors.textPrimary),
+                                          children: [
+                                            TextSpan(
+                                              text: '$cost Coins',
+                                              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.orange),
+                                            ),
+                                            const TextSpan(text: ' / minute'),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 32),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: GestureDetector(
+                                        onTap: () => Navigator.pop(context),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(vertical: 16),
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey.shade100,
+                                            borderRadius: BorderRadius.circular(16),
+                                          ),
+                                          child: const Center(
+                                            child: Text(
+                                              'Cancel',
+                                              style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold, fontSize: 16),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: GestureDetector(
+                                        onTap: () {
+                                          Navigator.pop(context);
+                                          _startCall(isVideo: isVideo);
+                                        },
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(vertical: 16),
+                                          decoration: BoxDecoration(
+                                            gradient: LinearGradient(
+                                              colors: isVideo 
+                                                ? [const Color(0xFF00c853), const Color(0xFF6CC449)]
+                                                : [const Color(0xFF01579b), const Color(0xFF0277bd)],
+                                            ),
+                                            borderRadius: BorderRadius.circular(16),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: (isVideo ? const Color(0xFF00c853) : const Color(0xFF01579b)).withValues(alpha: 0.3),
+                                                blurRadius: 10,
+                                                offset: const Offset(0, 4),
+                                              ),
+                                            ],
+                                          ),
+                                          child: const Center(
+                                            child: Text(
+                                              'Call Now',
+                                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _startCall({required bool isVideo}) async {
+    try {
+      final chat = await ref.read(chatRepositoryProvider).createOrGetChat(widget.userId);
+      final currentUser = ref.read(authRepositoryProvider).getCurrentUser();
+      
+      if (currentUser == null) return;
+
+      // 1. Create call session via CallRepository
+      // This handles creating call_history record AND sending a free invitation message
+      debugPrint('📞 Creating call session from profile...');
+      final callHistoryId = await ref.read(callRepositoryProvider).startCall(
+        channelId: chat.id,
+        callerId: currentUser.id,
+        receiverId: widget.userId,
+        mediaType: isVideo ? 'video' : 'voice',
+      );
+
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => CallScreen(
+              channelId: chat.id,
+              otherUserId: widget.userId,
+              isVideo: isVideo,
+              isInitiator: true,
+              callHistoryId: callHistoryId,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
 }
 
 class _ActionButton extends StatelessWidget {
@@ -828,29 +1060,36 @@ class _ActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ElevatedButton(
-      onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: color,
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 20),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: color.withValues(alpha: 0.2),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
             ),
-          ),
-        ],
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: Colors.white, size: 22),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

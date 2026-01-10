@@ -6,6 +6,8 @@ import 'package:bestie/core/constants/app_colors.dart';
 import 'package:bestie/features/home/domain/models/profile_model.dart';
 import 'package:bestie/features/profile/data/repositories/profile_repository.dart';
 import 'package:bestie/features/profile/data/providers/profile_providers.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
   final ProfileModel initialProfile;
@@ -35,6 +37,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   
   File? _newAvatarImage;
   File? _newCoverImage;
+  File? _newVerificationImage;
   
   // Gallery State
   List<String> _currentGalleryUrls = [];
@@ -104,6 +107,21 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     }
   }
 
+  Future<void> _pickVerificationPhoto() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(
+      source: ImageSource.camera,
+      preferredCameraDevice: CameraDevice.front,
+      imageQuality: 80,
+    );
+
+    if (pickedFile != null) {
+      setState(() {
+        _newVerificationImage = File(pickedFile.path);
+      });
+    }
+  }
+
   void _removeGalleryImage({int? newImageIndex, int? existingUrlIndex}) {
     setState(() {
       if (newImageIndex != null) {
@@ -112,6 +130,65 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         _currentGalleryUrls.removeAt(existingUrlIndex);
       }
     });
+  }
+
+  Future<void> _updateLocationFromDevice() async {
+    setState(() => _isLoading = true);
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+        if (mounted) {
+           ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Location permission denied')),
+          );
+        }
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+            desiredAccuracy: LocationAccuracy.medium);
+      
+      // We could also update lat/long in the profile if we wanted, but for now just the text
+      // Ideally we should update lat/long in _saveProfile too if we fetched it here.
+      // But let's stick to the text for now as that's what shows "Earth".
+      
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+
+      if (placemarks.isNotEmpty) {
+        final place = placemarks.first;
+        final city = place.locality ?? place.subAdministrativeArea ?? '';
+        final country = place.country ?? ''; // e.g. United States
+        final countryCode = place.isoCountryCode ?? '';
+
+        String locationName = '';
+        if (city.isNotEmpty && countryCode.isNotEmpty) {
+          locationName = '$city, $countryCode';
+        } else if (city.isNotEmpty) {
+          locationName = city;
+        } else if (country.isNotEmpty) {
+          locationName = country;
+        }
+        
+        if (locationName.isNotEmpty) {
+          _locationController.text = locationName;
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error fetching location: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _saveProfile() async {
@@ -139,7 +216,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       }
 
       // Update Profile Data
-      await repository.updateProfile(widget.initialProfile.id, {
+      final Map<String, dynamic> updates = {
         'name': _nameController.text.trim(),
         'bio': _bioController.text.trim(),
         'occupation': _occupationController.text.trim(),
@@ -150,7 +227,20 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         'gallery_urls': finalGalleryUrls,
         'avatar_url': avatarUrl,
         'cover_photo_url': coverUrl,
-      });
+      };
+
+      if (_newVerificationImage != null) {
+        final verificationUrl = await repository.uploadProfileImage(
+          widget.initialProfile.id, 
+          _newVerificationImage!, 
+          isCover: false // Reusing same logic but we could have uploadVerificationImage
+        );
+        updates['verification_photo_url'] = verificationUrl;
+        updates['status'] = 'pending_verification'; // Reset status to pending
+        updates['is_verified'] = false;
+      }
+
+      await repository.updateProfile(widget.initialProfile.id, updates);
 
       if (mounted) {
         ref.invalidate(currentUserProfileProvider); // Refresh profile
@@ -275,7 +365,16 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   const SizedBox(height: 16),
                   _buildTextField('Occupation', _occupationController, maxLength: 30),
                   const SizedBox(height: 16),
-                  _buildTextField('Location', _locationController, maxLength: 30),
+                  _buildTextField(
+                    'Location', 
+                    _locationController, 
+                    maxLength: 30,
+                    suffixWidget: IconButton(
+                      icon: const Icon(Icons.my_location, color: AppColors.primary),
+                      onPressed: _updateLocationFromDevice,
+                      tooltip: 'Use my current location',
+                    ),
+                  ),
                   const SizedBox(height: 16),
                    Row(
                     children: [
@@ -352,7 +451,85 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     ],
                   ),
 
-                      const SizedBox(height: 24),
+                  // Verification Section for Females
+                  if (_selectedGender.toLowerCase() == 'female' && !widget.initialProfile.isVerified) ...[
+                    const SizedBox(height: 24),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              'Photo Verification',
+                              style: TextStyle(
+                                color: Colors.grey.shade600,
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            if (widget.initialProfile.status == 'rejected')
+                              const Icon(Icons.error_outline, color: AppColors.error, size: 14),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        GestureDetector(
+                          onTap: _pickVerificationPhoto,
+                          child: Container(
+                            height: 200,
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: _newVerificationImage != null 
+                                    ? AppColors.primary 
+                                    : (widget.initialProfile.status == 'rejected' ? AppColors.error : Colors.grey.shade300),
+                                width: 2,
+                              ),
+                            ),
+                            child: _newVerificationImage != null
+                                ? ClipRRect(
+                                    borderRadius: BorderRadius.circular(14),
+                                    child: Image.file(_newVerificationImage!, fit: BoxFit.cover),
+                                  )
+                                : widget.initialProfile.verificationPhotoUrl.isNotEmpty && widget.initialProfile.status != 'rejected'
+                                    ? ClipRRect(
+                                        borderRadius: BorderRadius.circular(14),
+                                        child: Image.network(widget.initialProfile.verificationPhotoUrl, fit: BoxFit.cover),
+                                      )
+                                    : Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.camera_front_rounded,
+                                            size: 40,
+                                            color: widget.initialProfile.status == 'rejected' ? AppColors.error : Colors.grey,
+                                          ),
+                                          const SizedBox(height: 12),
+                                          Text(
+                                            widget.initialProfile.status == 'rejected'
+                                                ? 'Tap to Retake Photo'
+                                                : 'Tap to Take Verification Photo',
+                                            style: TextStyle(
+                                              color: widget.initialProfile.status == 'rejected' ? AppColors.error : Colors.grey,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Your face must be clearly visible. Only admins can see this photo.',
+                          style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ],
+
+                  const SizedBox(height: 24),
                   
                   // Gallery Section
                   Column(
@@ -465,7 +642,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController controller, {int maxLines = 1, TextInputType? keyboardType, int? maxLength}) {
+  Widget _buildTextField(String label, TextEditingController controller, {int maxLines = 1, TextInputType? keyboardType, int? maxLength, Widget? suffixWidget}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -478,6 +655,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           keyboardType: keyboardType,
           decoration: InputDecoration(
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            suffixIcon: suffixWidget,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(color: Colors.grey.shade300),

@@ -174,7 +174,7 @@ class _CreateMomentScreenState extends ConsumerState<CreateMomentScreen> {
                       ],
                     ),
                     loading: () => const SizedBox(), // Skeleton could go here
-                    error: (_, __) => const SizedBox(),
+                    error: (error, stackTrace) => const SizedBox(),
                   ),
                   
                   const SizedBox(height: 16),

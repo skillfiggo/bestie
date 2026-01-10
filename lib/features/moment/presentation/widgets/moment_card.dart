@@ -7,29 +7,48 @@ import 'package:bestie/features/moment/presentation/widgets/comments_sheet.dart'
 import 'package:bestie/features/chat/data/providers/chat_providers.dart';
 import 'package:bestie/features/chat/presentation/screens/chat_detail_screen.dart';
 
-class MomentCard extends ConsumerWidget {
+class MomentCard extends ConsumerStatefulWidget {
   final Moment moment;
 
   const MomentCard({super.key, required this.moment});
 
-  Future<void> _handleLike(WidgetRef ref) async {
+  @override
+  ConsumerState<MomentCard> createState() => _MomentCardState();
+}
+
+class _MomentCardState extends ConsumerState<MomentCard> {
+  bool _isProcessing = false;
+
+  Future<void> _handleLike() async {
+    if (_isProcessing) return;
+
+    setState(() {
+      _isProcessing = true;
+    });
+
     final repository = ref.read(momentRepositoryProvider);
-    // Optimistic Update can be handled by a specific provider management or just refreshing for now.
-    // Ideally we would update the local state.
-    // For MVP, we call repository and then refresh providers or let the parent deal with it.
-    // But since this is a list item, we probably want to assume success or wait.
     
     try {
-        if (moment.isLiked) {
-             await repository.unlikeMoment(moment.id);
+        if (widget.moment.isLiked) {
+             await repository.unlikeMoment(widget.moment.id);
         } else {
-             await repository.likeMoment(moment.id);
+             await repository.likeMoment(widget.moment.id);
         }
-        // Ideally invalidate just this item or update state manually.
-        // Invalidation is easiest but causes flicker.
+        // Invalidate moments to refresh the list
         ref.invalidate(momentsProvider);
     } catch (e) {
         debugPrint('Error liking moment: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to update like: $e')),
+          );
+        }
+    } finally {
+        if (mounted) {
+          setState(() {
+            _isProcessing = false;
+          });
+        }
     }
   }
 
@@ -38,12 +57,12 @@ class MomentCard extends ConsumerWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => CommentsSheet(momentId: moment.id),
+      builder: (context) => CommentsSheet(momentId: widget.moment.id),
     );
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(16),
@@ -66,10 +85,10 @@ class MomentCard extends ConsumerWidget {
               CircleAvatar(
                 radius: 24,
                 backgroundColor: Colors.grey.shade200,
-                backgroundImage: moment.userImage.isNotEmpty 
-                    ? NetworkImage(moment.userImage) 
+                backgroundImage: widget.moment.userImage.isNotEmpty 
+                    ? NetworkImage(widget.moment.userImage) 
                     : null,
-                child: moment.userImage.isEmpty 
+                child: widget.moment.userImage.isEmpty 
                     ? const Icon(Icons.person, color: Colors.grey)
                     : null,
               ),
@@ -80,7 +99,7 @@ class MomentCard extends ConsumerWidget {
                    Row(
                     children: [
                       Text(
-                        moment.userName,
+                        widget.moment.userName,
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -95,7 +114,7 @@ class MomentCard extends ConsumerWidget {
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
-                          '${moment.userAge}',
+                          '${widget.moment.userAge}',
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
@@ -106,7 +125,7 @@ class MomentCard extends ConsumerWidget {
                     ],
                   ),
                   Text(
-                    moment.timeAgo,
+                    widget.moment.timeAgo,
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey.shade500,
@@ -120,7 +139,7 @@ class MomentCard extends ConsumerWidget {
                   try {
                     final chat = await ref
                         .read(chatRepositoryProvider)
-                        .createOrGetChat(moment.userId);
+                        .createOrGetChat(widget.moment.userId);
 
                     if (context.mounted) {
                       Navigator.push(
@@ -150,7 +169,7 @@ class MomentCard extends ConsumerWidget {
           
           // Content Text
           Text(
-            moment.content,
+            widget.moment.content,
             style: const TextStyle(
               fontSize: 15,
               color: AppColors.textPrimary,
@@ -159,12 +178,12 @@ class MomentCard extends ConsumerWidget {
           ),
           
           // Optional Image
-          if (moment.imageUrl != null) ...[
+          if (widget.moment.imageUrl != null) ...[
             const SizedBox(height: 12),
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: Image.network(
-                moment.imageUrl!,
+                widget.moment.imageUrl!,
                 width: double.infinity,
                 height: 200,
                 fit: BoxFit.cover,
@@ -178,16 +197,16 @@ class MomentCard extends ConsumerWidget {
           Row(
             children: [
               _InteractionButton(
-                icon: moment.isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                color: moment.isLiked ? Colors.red : Colors.grey.shade600,
-                label: '${moment.likes}',
-                onTap: () => _handleLike(ref),
+                icon: widget.moment.isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                color: widget.moment.isLiked ? Colors.red : Colors.grey.shade600,
+                label: '${widget.moment.likes}',
+                onTap: _handleLike,
               ),
               const SizedBox(width: 24),
               _InteractionButton(
                 icon: Icons.comment_rounded,
                 color: Colors.grey.shade600,
-                label: '${moment.comments}',
+                label: '${widget.moment.comments}',
                 onTap: () => _showComments(context),
               ),
             ],

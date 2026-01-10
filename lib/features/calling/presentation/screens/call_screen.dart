@@ -9,6 +9,7 @@ import 'package:bestie/features/auth/data/providers/auth_providers.dart';
 import 'package:bestie/features/profile/data/repositories/profile_repository.dart';
 import 'package:bestie/features/home/domain/models/profile_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:screen_protector/screen_protector.dart';
 import 'package:bestie/core/services/audio_service.dart';
 
 class CallScreen extends ConsumerStatefulWidget {
@@ -35,6 +36,7 @@ class _CallScreenState extends ConsumerState<CallScreen> {
   int? _remoteUid;
   bool _localUserJoined = false;
   ProfileModel? _otherUserProfile;
+  ProfileModel? _currentUserProfile;
   
   late AgoraService _agoraService;
   Timer? _timer;
@@ -56,17 +58,25 @@ class _CallScreenState extends ConsumerState<CallScreen> {
   @override
   void initState() {
     super.initState();
-    _loadOtherUserProfile();
+    _secureScreen(); // Prevent screenshots
+    _loadProfiles();
     _initAgora();
     _startTimer();
     // Note: _setupCallStatusListener is called after we get the call history ID in _initAgora
   }
 
-  Future<void> _loadOtherUserProfile() async {
-    final profile = await ref.read(profileRepositoryProvider).getProfileById(widget.otherUserId);
+  Future<void> _loadProfiles() async {
+    final other = await ref.read(profileRepositoryProvider).getProfileById(widget.otherUserId);
+    final user = ref.read(authRepositoryProvider).getCurrentUser();
+    ProfileModel? current;
+    if (user != null) {
+      current = await ref.read(profileRepositoryProvider).getProfileById(user.id);
+    }
+
     if (mounted) {
       setState(() {
-        _otherUserProfile = profile;
+        _otherUserProfile = other;
+        _currentUserProfile = current;
       });
     }
   }
@@ -141,6 +151,24 @@ class _CallScreenState extends ConsumerState<CallScreen> {
           _errorMessage = e.toString().replaceAll('Exception: ', '');
         });
       }
+    }
+  }
+
+  Future<void> _secureScreen() async {
+    try {
+      await ScreenProtector.protectDataLeakageOn();
+      await ScreenProtector.preventScreenshotOn();
+    } catch (e) {
+      debugPrint('Failed to secure screen: $e');
+    }
+  }
+
+  Future<void> _unsecureScreen() async {
+    try {
+      await ScreenProtector.protectDataLeakageOff();
+      await ScreenProtector.preventScreenshotOff();
+    } catch (e) {
+      debugPrint('Failed to unsecure screen: $e');
     }
   }
 
@@ -324,13 +352,24 @@ class _CallScreenState extends ConsumerState<CallScreen> {
       final user = ref.read(authRepositoryProvider).getCurrentUser();
       if (user == null) return;
       
-      debugPrint('💰 Deducting call cost: $cost coins');
-      await ref.read(authRepositoryProvider).deductCoins(user.id, cost);
+      debugPrint('💰 Processing call payment: $cost coins');
+      // Use the new atomic transfer method (60/40 profit split)
+      await ref.read(callRepositoryProvider).processEarningTransfer(
+        senderId: user.id,
+        receiverId: widget.otherUserId,
+        amount: cost,
+        type: widget.isVideo ? 'video_call' : 'voice_call',
+      );
     } catch (e) {
-      debugPrint('❌ Insufficient funds for call: $e');
+      debugPrint('❌ Billing failed: $e');
       if (mounted) {
+        String errorMessage = 'Insufficient coins. Call ending...';
+        if (e.toString().contains('Insufficient coins')) {
+           errorMessage = 'Insufficient coins. Please recharge.';
+        }
+        
         ScaffoldMessenger.of(context).showSnackBar(
-           const SnackBar(content: Text('Insufficient coins. Call ending...')),
+           SnackBar(content: Text(errorMessage)),
         );
         // Delay slightly to let user see message
         Future.delayed(const Duration(seconds: 1), () {
@@ -353,8 +392,11 @@ class _CallScreenState extends ConsumerState<CallScreen> {
           _leaveCall(status: 'timeout');
         }
 
-        // Billing Logic: Deduct coins every minute for Initiator
-        if (widget.isInitiator && _remoteUid != null) {
+        // Billing Logic: Only Male users pay.
+        // If current user is Male, he pays regardless of being initiator or receiver.
+        final isPayer = _currentUserProfile?.gender == 'male';
+        
+        if (isPayer && _remoteUid != null) {
           if (_connectedSeconds % 60 == 0) {
             _deductCallCost();
           }
@@ -379,17 +421,28 @@ class _CallScreenState extends ConsumerState<CallScreen> {
       finalStatus = 'canceled';
     }
 
-    // Send Missed Call Notification if connection was never established
-    if (widget.isInitiator && _remoteUid == null) {
+    // Send Call Details/Missed Call Notification (Free system messages)
+    if (widget.isInitiator) {
         final currentUser = ref.read(authRepositoryProvider).getCurrentUser();
         if (currentUser != null) {
-           // Fire and forget - don't await to avoid delaying exit
-           ref.read(callRepositoryProvider).sendMissedCallMessage(
-             chatId: widget.channelId,
-             senderId: currentUser.id,
-             receiverId: widget.otherUserId,
-             isVideo: widget.isVideo,
-           );
+           if (_remoteUid == null) {
+              // connection was never established -> Missed Call
+              ref.read(callRepositoryProvider).sendMissedCallMessage(
+                chatId: widget.channelId,
+                senderId: currentUser.id,
+                receiverId: widget.otherUserId,
+                isVideo: widget.isVideo,
+              );
+           } else {
+              // Call was successful -> Send Details
+              ref.read(callRepositoryProvider).sendCallEndMessage(
+                chatId: widget.channelId,
+                senderId: currentUser.id,
+                receiverId: widget.otherUserId,
+                mediaType: widget.isVideo ? 'video' : 'voice',
+                durationSeconds: _callDuration,
+              );
+           }
         }
     }
     
@@ -486,6 +539,7 @@ class _CallScreenState extends ConsumerState<CallScreen> {
 
   @override
   void dispose() {
+    _unsecureScreen(); // Re-enable screenshots
     _timer?.cancel();
     _tokenRefreshTimer?.cancel();
     _callChannel?.unsubscribe();
@@ -612,12 +666,10 @@ class _CallScreenState extends ConsumerState<CallScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(
-                            _otherUserProfile!.gender == 'Female' ? Icons.female : Icons.male,
-                            color: Colors.white,
-                            size: 16,
-                          ),
-                          const SizedBox(width: 6),
+                          if (_otherUserProfile!.isVerified) ...[
+                            const Icon(Icons.verified, color: AppColors.info, size: 16),
+                            const SizedBox(width: 6),
+                          ],
                           Text(
                             '${_otherUserProfile!.age} years old',
                             style: const TextStyle(
@@ -626,10 +678,6 @@ class _CallScreenState extends ConsumerState<CallScreen> {
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                          if (_otherUserProfile!.isVerified) ...[
-                            const SizedBox(width: 8),
-                            const Icon(Icons.verified, color: AppColors.info, size: 16),
-                          ],
                         ],
                       ),
                     ),

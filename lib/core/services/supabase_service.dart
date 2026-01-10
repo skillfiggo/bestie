@@ -16,8 +16,7 @@ class SupabaseService {
   /// Initialize Supabase with credentials from .env file
   static Future<void> initialize() async {
     try {
-      // Load environment variables
-      await dotenv.load(fileName: '.env');
+
 
       final supabaseUrl = dotenv.env['SUPABASE_URL'];
       final supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'];

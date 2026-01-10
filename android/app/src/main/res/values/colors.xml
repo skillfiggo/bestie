@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Splash Screen Background Color -->
+    <!-- Change this to your brand color -->
+    <!-- White: #FFFFFF -->
+    <!-- Lime Green: #65A30D -->
+    <!-- Black: #000000 -->
+    <color name="splash_background">#65A30D</color>
+	<color name="ic_launcher_background">#65A30D</color>
+</resources>

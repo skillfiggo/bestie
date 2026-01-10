@@ -2,8 +2,10 @@
     "deno.enable": true,
     "deno.unstable": true,
     "deno.config": "./supabase/functions/deno.json",
+    "deno.importMap": "./supabase/functions/import_map.json",
     "deno.enablePaths": [
         "./supabase/functions"
     ],
-    "typescript.preferences.importModuleSpecifier": "non-relative"
+    "deno.path": "C:\\Users\\admin\\.deno\\bin\\deno.exe",
+    "java.jdt.ls.java.home": "C:\\Program Files\\Android\\Android Studio\\jbr"
 }
