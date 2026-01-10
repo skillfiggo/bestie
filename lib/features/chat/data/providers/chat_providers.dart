@@ -54,6 +54,6 @@ final currentChatIdProvider = StateProvider<String?>((ref) => null);
 // Provider to track total unread messages count derived from chat list
 final totalUnreadMessagesProvider = Provider<int>((ref) {
   final chatsAsync = ref.watch(chatListProvider);
-  // Return 0 if loading or error (gracefully handle offline state)
-  return chatsAsync.valueOrNull?.fold(0, (sum, chat) => sum + chat.unreadCount) ?? 0;
+  final chats = chatsAsync.valueOrNull ?? [];
+  return chats.fold(0, (sum, chat) => sum + chat.unreadCount);
 });
