@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bestie/core/constants/app_colors.dart';
 import 'package:bestie/features/auth/data/providers/auth_providers.dart';
-import 'dart:io';
 import 'package:bestie/app/router.dart';
 import 'package:bestie/features/auth/presentation/widgets/signup_steps/email_step.dart';
 import 'package:bestie/features/auth/presentation/widgets/signup_steps/auth_verification_step.dart';
@@ -10,8 +9,6 @@ import 'package:bestie/features/auth/presentation/widgets/signup_steps/password_
 import 'package:bestie/features/auth/presentation/widgets/signup_steps/profile_details_step.dart';
 import 'package:bestie/features/auth/presentation/widgets/signup_steps/gender_step.dart';
 import 'package:bestie/features/auth/presentation/widgets/signup_steps/female_verification_step.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart';
 
 class SignupScreen extends ConsumerStatefulWidget {
   final Function(String?) onSwitchToLogin;
@@ -286,7 +283,14 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
-        if (_pageController.hasClients && _pageController.page! > 0) {
+        final currentPage = (_pageController.hasClients ? _pageController.page?.round() : 0) ?? 0;
+        
+        // Prevent going back after password stage (step 2)
+        if (currentPage > 2) {
+          return; // Do nothing - user cannot go back
+        }
+        
+        if (currentPage > 0) {
           _previousPage();
         } else {
           Navigator.of(context).pop();
@@ -299,18 +303,22 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
               child: Row(
                 children: [
-                   IconButton(
-                    icon: const Icon(Icons.arrow_back_ios_new_rounded),
-                    onPressed: () {
-                      if (_pageController.hasClients && _pageController.page! > 0) {
-                        _previousPage();
-                      } else {
-                         // Or pop
-                        widget.onSwitchToLogin(null);
-                      }
-                    },
-                    color: AppColors.textPrimary,
-                  ),
+                  // Only show back button before and during password stage
+                  if (((_pageController.hasClients ? _pageController.page?.round() : 0) ?? 0) <= 2)
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                      onPressed: () {
+                        final currentPage = (_pageController.hasClients ? _pageController.page?.round() : 0) ?? 0;
+                        
+                        if (currentPage > 0) {
+                          _previousPage();
+                        } else {
+                           // Or pop
+                          widget.onSwitchToLogin(null);
+                        }
+                      },
+                      color: AppColors.textPrimary,
+                    ),
                   const Spacer(),
                    if (_gender == null) // Show Login option only on first step
                       TextButton(
