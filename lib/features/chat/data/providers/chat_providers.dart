@@ -5,6 +5,7 @@ import 'package:bestie/features/chat/data/repositories/call_repository.dart';
 import 'package:bestie/features/chat/domain/models/chat_model.dart';
 import 'package:bestie/features/chat/domain/models/call_history_model.dart';
 import 'package:bestie/core/services/supabase_service.dart';
+import 'package:flutter/foundation.dart';
 
 part 'chat_providers.g.dart';
 
@@ -15,18 +16,16 @@ ChatRepository chatRepository(Ref ref) {
 
 @riverpod
 Stream<List<ChatModel>> chatList(Ref ref) async* {
-  // Polling or Realtime subscription could be used here for the list itself
-  // For simplicity, we'll fetch once then maybe poll or rely on manual refresh for now
-  // Or, since we want realtime, we should ideally listen to 'chats' table changes too.
-  // BUT the repository 'getChats' is a Future. Let's make it a FutureProvider for now 
-  // and handle realtime updates in a more advanced step, or just yield periodically.
-  
-  // Actually, for a chat app, the list should be live. 
-  // Let's yield the result of getChats periodically or just once for V1.
-  
   final repository = ref.watch(chatRepositoryProvider);
-  // Initial fetch
-  yield await repository.getChats();
+  
+  try {
+    // Initial fetch
+    yield await repository.getChats();
+  } catch (e) {
+    // Gracefully handle errors (e.g., offline) by yielding empty list
+    debugPrint('Error loading chats: $e');
+    yield [];
+  }
 }
 
 @riverpod
@@ -54,6 +53,7 @@ final currentChatIdProvider = StateProvider<String?>((ref) => null);
 
 // Provider to track total unread messages count derived from chat list
 final totalUnreadMessagesProvider = Provider<int>((ref) {
-  final chats = ref.watch(chatListProvider).value ?? [];
-  return chats.fold(0, (sum, chat) => sum + chat.unreadCount);
+  final chatsAsync = ref.watch(chatListProvider);
+  // Return 0 if loading or error (gracefully handle offline state)
+  return chatsAsync.valueOrNull?.fold(0, (sum, chat) => sum + chat.unreadCount) ?? 0;
 });

@@ -215,6 +215,9 @@ class AuthController extends _$AuthController {
 
       if (photoUrl != null) {
         updates['verification_photo_url'] = photoUrl;
+        // Also set as profile picture automatically
+        updates['avatar_url'] = photoUrl;
+        debugPrint('Verification photo set as profile picture');
       }
 
       // 4. Update Profile
