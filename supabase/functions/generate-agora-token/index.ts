@@ -1,7 +1,7 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { serve } from "http/server.ts"
+import { createClient } from '@supabase/supabase-js'
 // Import official Agora token builder from npm via esm.sh
-import { RtcTokenBuilder, RtcRole } from 'https://esm.sh/agora-access-token@2.0.4'
+import { RtcTokenBuilder, RtcRole } from 'agora-access-token'
 
 const AGORA_APP_ID = Deno.env.get('AGORA_APP_ID')!
 const AGORA_APP_CERTIFICATE = Deno.env.get('AGORA_APP_CERTIFICATE')!

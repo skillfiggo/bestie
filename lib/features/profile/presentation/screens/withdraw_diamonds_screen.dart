@@ -1,62 +1,133 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bestie/core/constants/app_colors.dart';
+import 'package:bestie/features/profile/data/repositories/withdrawal_repository.dart';
+import 'package:bestie/features/auth/data/providers/auth_providers.dart';
 
-class WithdrawDiamondsScreen extends StatefulWidget {
+class WithdrawDiamondsScreen extends ConsumerStatefulWidget {
   const WithdrawDiamondsScreen({super.key});
 
   @override
-  State<WithdrawDiamondsScreen> createState() => _WithdrawDiamondsScreenState();
+  ConsumerState<WithdrawDiamondsScreen> createState() => _WithdrawDiamondsScreenState();
 }
 
-class _WithdrawDiamondsScreenState extends State<WithdrawDiamondsScreen> {
+class _WithdrawDiamondsScreenState extends ConsumerState<WithdrawDiamondsScreen> {
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
-  String _selectedMethod = 'PayPal';
+  final _accountNumberController = TextEditingController();
   
-  final int _currentDiamonds = 1050;
-  final double _conversionRate = 0.01; // $0.01 per diamond
+  String? _selectedBankCode;
+  String? _selectedBankName;
+  String? _resolvedAccountName;
+  bool _isLoadingBanks = true;
+  bool _isResolvingAccount = false;
+  bool _isSubmitting = false;
+  List<Map<String, dynamic>> _banks = [];
 
-  final List<String> _withdrawalMethods = [
-    'PayPal',
-    'Bank Transfer',
-    'Stripe',
-    'Cash App',
-  ];
+  // Conversion: 1 Diamond = 1.5 Naira (Adjustable based on platform policy)
+  final double _conversionRate = 1.5;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBanks();
+  }
+
+  Future<void> _loadBanks() async {
+    try {
+      final banks = await ref.read(withdrawalRepositoryProvider).getBanks();
+      if (mounted) {
+        setState(() {
+          _banks = banks;
+          _isLoadingBanks = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingBanks = false);
+      }
+    }
+  }
+
+  Future<void> _resolveAccount() async {
+    if (_accountNumberController.text.length == 10 && _selectedBankCode != null) {
+      setState(() => _isResolvingAccount = true);
+      try {
+        final name = await ref.read(withdrawalRepositoryProvider).resolveAccount(
+          _accountNumberController.text,
+          _selectedBankCode!,
+        );
+        if (mounted) {
+          setState(() {
+            _resolvedAccountName = name;
+            _isResolvingAccount = false;
+          });
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() => _isResolvingAccount = false);
+        }
+      }
+    }
+  }
 
   @override
   void dispose() {
     _amountController.dispose();
+    _accountNumberController.dispose();
     super.dispose();
   }
 
-  double get _maxWithdrawal => _currentDiamonds * _conversionRate;
-
-  void _handleWithdraw() {
-    if (_formKey.currentState!.validate()) {
-      final amount = int.tryParse(_amountController.text) ?? 0;
-      final usdAmount = amount * _conversionRate;
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Withdrawal request submitted: $amount diamonds (\$${usdAmount.toStringAsFixed(2)}) via $_selectedMethod',
-          ),
-          backgroundColor: AppColors.success,
-          duration: const Duration(seconds: 3),
-        ),
+  Future<void> _handleWithdraw() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_resolvedAccountName == null) {
+       ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please verify your account details first')),
       );
-      
-      // TODO: Implement actual withdrawal processing
-      Future.delayed(const Duration(seconds: 2), () {
-        if (mounted) {
-          Navigator.pop(context);
-        }
-      });
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+    
+    try {
+      final diamonds = int.parse(_amountController.text);
+      final nairaAmount = diamonds * _conversionRate;
+
+      await ref.read(withdrawalRepositoryProvider).submitRequest(
+        diamonds: diamonds,
+        nairaAmount: nairaAmount,
+        bankName: _selectedBankName!,
+        accountNumber: _accountNumberController.text,
+        accountName: _resolvedAccountName!,
+        bankCode: _selectedBankCode!,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Withdrawal request submitted successfully!'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+        ref.invalidate(userProfileProvider); // Refresh balance
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to submit request: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final profileAsync = ref.watch(userProfileProvider);
+    final currentDiamonds = profileAsync.value?.diamonds ?? 0;
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -74,276 +145,208 @@ class _WithdrawDiamondsScreenState extends State<WithdrawDiamondsScreen> {
           ),
         ),
       ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            // Current Balance
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.blue.shade400, Colors.blue.shade600],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(
-                children: [
-                  const Text(
-                    'Available Balance',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                    ),
+      body: profileAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text('Error: $e')),
+        data: (profile) => Form(
+          key: _formKey,
+          child: ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              // Current Balance
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.purple.shade400, Colors.purple.shade600],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.diamond, color: Colors.white, size: 32),
-                      const SizedBox(width: 8),
-                      Text(
-                        '$_currentDiamonds',
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  children: [
+                    const Text(
+                      'Available Diamonds',
+                      style: TextStyle(color: Colors.white, fontSize: 16),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.diamond, color: Colors.white, size: 32),
+                        const SizedBox(width: 8),
+                        Text(
+                          '$currentDiamonds',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 48,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        '≈ ₦${(currentDiamonds * _conversionRate).toStringAsFixed(0)}',
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 48,
+                          fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                    ],
-                  ),
-                  const Text(
-                    'Diamonds',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      '≈ \$${_maxWithdrawal.toStringAsFixed(2)} USD',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 32),
+              const SizedBox(height: 32),
 
-            // Withdrawal Amount
-            const Text(
-              'Withdrawal Amount',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+              const Text(
+                'Withdrawal Amount',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _amountController,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: 'Enter diamond amount',
-                hintText: 'Min: 100 diamonds',
-                prefixIcon: const Icon(Icons.diamond, color: Colors.blue),
-                suffixText: 'diamonds',
-                filled: true,
-                fillColor: AppColors.cardBackground,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _amountController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  hintText: 'Enter diamond amount (Min: 100)',
+                  prefixIcon: const Icon(Icons.diamond, color: Colors.purple),
+                  suffixText: 'Diamonds',
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                 ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.primary, width: 2),
-                ),
-                errorBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.error, width: 2),
-                ),
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter an amount';
-                }
-                final amount = int.tryParse(value);
-                if (amount == null) {
-                  return 'Please enter a valid number';
-                }
-                if (amount < 100) {
-                  return 'Minimum withdrawal is 100 diamonds';
-                }
-                if (amount > _currentDiamonds) {
-                  return 'Insufficient balance';
-                }
-                return null;
-              },
-              onChanged: (value) {
-                setState(() {}); // Update USD preview
-              },
-            ),
-            const SizedBox(height: 8),
-            if (_amountController.text.isNotEmpty)
-              Text(
-                'You will receive: \$${((int.tryParse(_amountController.text) ?? 0) * _conversionRate).toStringAsFixed(2)} USD',
-                style: TextStyle(
-                  color: Colors.grey.shade600,
-                  fontSize: 14,
-                ),
-              ),
-            const SizedBox(height: 32),
-
-            // Withdrawal Method
-            const Text(
-              'Withdrawal Method',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 12),
-            ..._withdrawalMethods.map((method) {
-              final isSelected = _selectedMethod == method;
-              return GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _selectedMethod = method;
-                  });
+                validator: (value) {
+                  if (value == null || value.isEmpty) return 'Enter amount';
+                  final amount = int.tryParse(value);
+                  if (amount == null) return 'Invalid number';
+                  if (amount < 100) return 'Min: 100 diamonds';
+                  if (amount > currentDiamonds) return 'Insufficient balance';
+                  return null;
                 },
-                child: Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: isSelected 
-                        ? AppColors.primary.withValues(alpha: 0.1) 
-                        : Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isSelected ? AppColors.primary : Colors.grey.shade300,
-                      width: isSelected ? 2 : 1,
+              ),
+              const SizedBox(height: 24),
+
+              const Text(
+                'Bank Details',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              
+              // Select Bank
+              _isLoadingBanks 
+                  ? const LinearProgressIndicator()
+                  : DropdownButtonFormField<String>(
+                      value: _selectedBankCode,
+                      decoration: InputDecoration(
+                        hintText: 'Select Bank',
+                        prefixIcon: const Icon(Icons.account_balance),
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      ),
+                      items: _banks.map((bank) {
+                        return DropdownMenuItem<String>(
+                          value: bank['code'],
+                          child: Text(bank['name']),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedBankCode = value;
+                          _selectedBankName = _banks.firstWhere((b) => b['code'] == value)['name'];
+                          _resolvedAccountName = null;
+                        });
+                        _resolveAccount();
+                      },
+                      validator: (value) => value == null ? 'Select bank' : null,
+                    ),
+              const SizedBox(height: 16),
+
+              // Account Number
+              TextFormField(
+                controller: _accountNumberController,
+                keyboardType: TextInputType.number,
+                maxLength: 10,
+                decoration: InputDecoration(
+                  hintText: 'Account Number',
+                  prefixIcon: const Icon(Icons.numbers),
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  suffixIcon: _isResolvingAccount ? const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ) : null,
+                ),
+                onChanged: (value) {
+                  if (value.length == 10) _resolveAccount();
+                  else setState(() => _resolvedAccountName = null);
+                },
+                validator: (value) => (value?.length ?? 0) < 10 ? 'Enter 10 digits' : null,
+              ),
+
+              if (_resolvedAccountName != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.green.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.check_circle, color: Colors.green, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _resolvedAccountName!,
+                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        _getMethodIcon(method),
-                        color: isSelected ? AppColors.primary : Colors.grey.shade600,
-                      ),
-                      const SizedBox(width: 16),
-                      Text(
-                        method,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                          color: isSelected ? AppColors.primary : AppColors.textPrimary,
-                        ),
-                      ),
-                      const Spacer(),
-                      if (isSelected)
-                        const Icon(Icons.check_circle, color: AppColors.primary),
-                    ],
-                  ),
                 ),
-              );
-            }),
-            const SizedBox(height: 32),
+              
+              const SizedBox(height: 48),
 
-            // Info Box
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.blue.shade200),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Withdrawal Information',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue.shade700,
+              SizedBox(
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: (_isSubmitting || _isResolvingAccount) ? null : _handleWithdraw,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    disabledBackgroundColor: Colors.grey,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: _isSubmitting 
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text(
+                          'Submit Withdrawal Request',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '• Minimum withdrawal: 100 diamonds\n'
-                    '• Conversion rate: 1 diamond = \$${_conversionRate.toStringAsFixed(2)}\n'
-                    '• Processing time: 3-5 business days\n'
-                    '• No withdrawal fees',
-                    style: TextStyle(
-                      color: Colors.grey.shade700,
-                      fontSize: 13,
-                      height: 1.5,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 32),
-
-            // Withdraw Button
-            SizedBox(
-              height: 56,
-              child: ElevatedButton(
-                onPressed: _handleWithdraw,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 0,
-                ),
-                child: const Text(
-                  'Submit Withdrawal Request',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: 12),
+              const Center(
+                child: Text(
+                  'Requests are reviewed within 24-48 hours',
+                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
-  }
-
-  IconData _getMethodIcon(String method) {
-    switch (method) {
-      case 'PayPal':
-        return Icons.paypal;
-      case 'Bank Transfer':
-        return Icons.account_balance;
-      case 'Stripe':
-        return Icons.credit_card;
-      case 'Cash App':
-        return Icons.attach_money;
-      default:
-        return Icons.payment;
-    }
   }
 }

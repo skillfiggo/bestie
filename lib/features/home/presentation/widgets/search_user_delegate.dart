@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:bestie/core/constants/app_colors.dart';
 import 'package:bestie/features/profile/data/repositories/profile_repository.dart';
 import 'package:bestie/features/home/domain/models/profile_model.dart';
 import 'package:bestie/features/profile/presentation/screens/user_profile_screen.dart';

@@ -1,12 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:bestie/core/constants/app_colors.dart';
 import 'package:bestie/app/router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:bestie/features/auth/data/providers/auth_providers.dart';
 
-class AuthLandingScreen extends StatelessWidget {
+class AuthLandingScreen extends ConsumerWidget {
   const AuthLandingScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // We remove the listener here because it triggers on EVERY AsyncData,
+    // including after sendOtp() which we DON'T want to navigate on.
+    // Navigation is now handled locally in screens or by session stream.
+
+    final authState = ref.watch(authControllerProvider);
+    final isLoading = authState is AsyncLoading;
+
     return Scaffold(
       backgroundColor: AppColors.primary, // Using primary green as background base
       body: Stack(
@@ -70,8 +79,25 @@ class AuthLandingScreen extends StatelessWidget {
                                 icon: Icons.g_mobiledata_rounded,
                                 color: Colors.white,
                                 textColor: Colors.black,
-                                onPressed: () {},
+                                onPressed: isLoading ? () {} : () async {
+                                  await ref.read(authControllerProvider.notifier).signInWithGoogle();
+                                  if (context.mounted) {
+                                    final authState = ref.read(authControllerProvider);
+                                    authState.whenOrNull(
+                                      data: (_) {
+                                        // Google sign-in successful, navigate to main shell
+                                        Navigator.pushNamedAndRemoveUntil(context, AppRouter.mainShell, (route) => false);
+                                      },
+                                    );
+                                  }
+                                },
                               ),
+                              if (isLoading)
+                                const Positioned.fill(
+                                  child: Center(
+                                    child: CircularProgressIndicator(),
+                                  ),
+                                ),
                               Positioned(
                                 top: -10,
                                 right: 10,
@@ -97,65 +123,27 @@ class AuthLandingScreen extends StatelessWidget {
                             ],
                           ),
                           const SizedBox(height: 16),
-                              _ActionButton(
-                                text: 'Sign Up',
-                                icon: Icons.flash_on_rounded,
-                                color: AppColors.primaryDark,
-                                textColor: Colors.white,
-                                onPressed: () {
-                                  Navigator.pushNamed(
-                                    context, 
-                                    AppRouter.authForms,
-                                    arguments: 1,
-                                  );
-                                },
-                              ),
-                              const SizedBox(height: 16),
-                              _ActionButton(
-                                text: 'Demo Login',
-                                icon: Icons.developer_mode,
-                                color: Colors.grey.shade200,
-                                textColor: Colors.black87,
-                                onPressed: () {
-                                  Navigator.pushNamedAndRemoveUntil(
-                                    context,
-                                    AppRouter.mainShell,
-                                    (route) => false,
-                                  );
-                                },
-                              ),
-                              const SizedBox(height: 32),
-                          
-                              // Social Icons Row
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  _SocialCircleButton(
-                                    icon: Icons.facebook,
-                                    color: const Color(0xFF1877F2),
-                                    onPressed: () {},
-                                  ),
-                                  const SizedBox(width: 20),
-                                  _SocialCircleButton(
-                                    icon: Icons.phone_rounded,
-                                    color: AppColors.lime,
-                                    iconColor: Colors.black,
-                                    onPressed: () {},
-                                  ),
-                                  const SizedBox(width: 20),
-                                  _SocialCircleButton(
-                                    icon: Icons.mail_rounded,
-                                    color: Colors.black, // Matches image style
-                                    onPressed: () {
-                                      Navigator.pushNamed(
-                                        context, 
-                                        AppRouter.authForms,
-                                        arguments: 1,
-                                      );
-                                    },
-                                  ),
-                                ],
-                              ),
+                          _ActionButton(
+                            text: 'Email',
+                            icon: Icons.mail_rounded,
+                            color: AppColors.primaryDark,
+                            textColor: Colors.white,
+                            onPressed: () {
+                              Navigator.pushNamed(
+                                context, 
+                                AppRouter.authForms,
+                                arguments: 1, // Show signup tab by default
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 24),
+                          Text(
+                            'Social login is faster and safer',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.6),
+                              fontSize: 12,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -274,40 +262,6 @@ class _ActionButton extends StatelessWidget {
             ),
             const SizedBox(width: 28), // Balance the icon
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SocialCircleButton extends StatelessWidget {
-  final IconData icon;
-  final Color color;
-  final Color iconColor;
-  final VoidCallback onPressed;
-
-  const _SocialCircleButton({
-    required this.icon,
-    required this.color,
-    this.iconColor = Colors.white,
-    required this.onPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onPressed,
-      child: Container(
-        width: 50,
-        height: 50,
-        decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
-        ),
-        child: Icon(
-          icon,
-          color: iconColor,
-          size: 24,
         ),
       ),
     );

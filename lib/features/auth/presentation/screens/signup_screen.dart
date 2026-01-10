@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bestie/core/constants/app_colors.dart';
-import 'package:bestie/features/auth/presentation/screens/verification_screen.dart';
 import 'package:bestie/features/auth/data/providers/auth_providers.dart';
-import 'package:bestie/features/auth/presentation/widgets/signup_steps/gender_step.dart';
-import 'package:bestie/features/auth/presentation/widgets/signup_steps/female_profile_step.dart';
-import 'package:bestie/features/auth/presentation/widgets/signup_steps/female_verification_step.dart';
-import 'package:bestie/features/auth/presentation/widgets/signup_steps/male_name_step.dart';
 import 'dart:io';
-import 'package:bestie/features/auth/presentation/widgets/signup_steps/male_credentials_step.dart';
+import 'package:bestie/app/router.dart';
+import 'package:bestie/features/auth/presentation/widgets/signup_steps/email_step.dart';
+import 'package:bestie/features/auth/presentation/widgets/signup_steps/auth_verification_step.dart';
+import 'package:bestie/features/auth/presentation/widgets/signup_steps/password_step.dart';
+import 'package:bestie/features/auth/presentation/widgets/signup_steps/profile_details_step.dart';
+import 'package:bestie/features/auth/presentation/widgets/signup_steps/gender_step.dart';
+import 'package:bestie/features/auth/presentation/widgets/signup_steps/female_verification_step.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 
 class SignupScreen extends ConsumerStatefulWidget {
-  final VoidCallback onSwitchToLogin;
+  final Function(String?) onSwitchToLogin;
 
   const SignupScreen({
     super.key,
@@ -26,6 +29,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   final PageController _pageController = PageController();
   
   // State
+  // State flags for transitions
+  bool _otpSent = false;
+  bool _otpVerified = false;
+  bool _passwordSet = false;
   String? _gender;
 
   // Controllers
@@ -89,49 +96,87 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   }
 
 
-  Future<void> _handleSignup([String? verificationPhotoPath]) async {
+  Future<void> _handleSendOtp() async {
+    await ref.read(authControllerProvider.notifier).startSignup(_emailController.text.trim());
+  }
+
+  void _showEmailExistsDialog(String email) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Account Exists'),
+        content: Text('An account with $email already exists. Would you like to sign in instead?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: AppColors.primary),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              widget.onSwitchToLogin(email);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary, // Changed to primary green to match design better
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text('Sign In'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleVerify(String code) async {
+    await ref.read(authControllerProvider.notifier).verifyOtp(
+      email: _emailController.text.trim(),
+      token: code,
+    );
+  }
+
+  Future<void> _onOtpVerified() async {
+    final user = ref.read(authRepositoryProvider).getCurrentUser();
+    if (user != null) {
+      try {
+        await ref.read(authRepositoryProvider).createProfile(user.id, {
+          'status': 'pending_profile',
+        });
+      } catch (e) {
+        debugPrint('Initial profile creation failed (might already exist): $e');
+      }
+    }
+  }
+
+  Future<void> _handlePasswordSet() async {
+    await ref.read(authControllerProvider.notifier).updatePassword(_passwordController.text);
+  }
+
+  Future<void> _handleProfileComplete([String? verificationPhotoPath]) async {
     final age = _calculateAge(_dobController.text);
     
-    // 1. Sign Up (creates user and placeholder profile)
-    await ref.read(authControllerProvider.notifier).signUp(
-      email: _emailController.text.trim(),
-      password: _passwordController.text,
-      userData: {
-        'name': _nameController.text.trim(),
-        'gender': _gender ?? 'other',
-        'age': age,
-        'bio': 'New to Bestie!',
-        'avatar_url': '', 
-        'interests': [],
-        // We can't send verification photo URL yet because we aren't signed in to upload it
-      },
-    );
-
-    // 2. If success and we have a photo, upload it
-    if (verificationPhotoPath != null) {
-       final authRepo = ref.read(authRepositoryProvider);
-       final storageRepo = ref.read(storageRepositoryProvider);
-       final user = authRepo.getCurrentUser();
-       
-       if (user != null) {
-         try {
-           final path = '${user.id}/verification_${DateTime.now().millisecondsSinceEpoch}.jpg';
-           final url = await storageRepo.uploadFile(
-             bucket: 'avatars', // Using avatars bucket for now
-             path: path,
-             file: File(verificationPhotoPath),
-           );
-           
-           // 3. Update profile with URL
-           await authRepo.updateProfile(user.id, {
-             'verification_photo_url': url,
-           });
-         } catch (e) {
-           debugPrint('Verification upload failed: $e');
-           // Don't block signup success
-         }
-       }
+    // Show feedback that upload is starting
+    if (verificationPhotoPath != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Uploading verification photo...'),
+          duration: Duration(seconds: 2),
+          backgroundColor: AppColors.primary,
+        ),
+      );
     }
+    
+    await ref.read(authControllerProvider.notifier).completeProfile(
+      name: _nameController.text.trim(),
+      gender: _gender ?? 'other',
+      age: age,
+      verificationPhotoPath: verificationPhotoPath,
+    );
   }
 
   void _onGenderSelected(String gender) {
@@ -144,45 +189,47 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
      });
   }
 
-  Future<bool> _onWillPop() async {
-     if (_pageController.hasClients && _pageController.page! > 0) {
-       _previousPage();
-       return false;
-     }
-     return true; 
-  }
-
   @override
   Widget build(BuildContext context) {
     ref.listen<AsyncValue<void>>(
       authControllerProvider,
       (previous, next) {
-        next.whenOrNull(
-          data: (_) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => VerificationScreen(email: _emailController.text.trim()),
-              ),
+        if (next is AsyncData) {
+          final currentPage = (_pageController.hasClients ? _pageController.page?.round() : 0) ?? 0;
+          
+          if (currentPage == 0 && !_otpSent) {
+            setState(() => _otpSent = true);
+            _nextPage();
+          } else if (currentPage == 1 && !_otpVerified) {
+            setState(() => _otpVerified = true);
+            _onOtpVerified();
+            _nextPage();
+          } else if (currentPage == 2 && !_passwordSet) {
+            setState(() => _passwordSet = true);
+            _nextPage();
+          } else if (currentPage >= 4) {
+            // Profile completion successful
+            Navigator.pushNamedAndRemoveUntil(
+              context, 
+              AppRouter.mainShell, 
+              (route) => false
             );
-          },
-              error: (error, stackTrace) {
-               String message = error.toString().replaceAll('Exception:', '').trim();
-               if (message.contains('rate_limit') || message.contains('429')) {
-                 message = 'Please wait a minute before trying again (Security Limit).';
-               } else if (message.contains('User already registered')) {
-                 message = 'This email is already registered. Try logging in.';
-               }
-               
-               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(message),
-                  backgroundColor: AppColors.error,
-                  duration: const Duration(seconds: 4),
-                ),
-              );
-            },
-        );
+          }
+        } else if (next is AsyncError) {
+          String message = next.error.toString().replaceAll('Exception:', '').trim();
+          
+          if (message == 'email_exists') {
+            _showEmailExistsDialog(_emailController.text.trim());
+            return;
+          }
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(message),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
       },
     );
 
@@ -190,40 +237,61 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
 
     // Define pages based on state
     List<Widget> pages = [
+      // 0: Email
+      EmailStep(
+        emailController: _emailController,
+        onNext: _handleSendOtp,
+        isLoading: isLoading,
+      ),
+      // 1: OTP
+      AuthVerificationStep(
+        email: _emailController.text,
+        onVerify: _handleVerify,
+        onResend: _handleSendOtp,
+        isLoading: isLoading,
+      ),
+      // 2: Password
+      PasswordStep(
+        passwordController: _passwordController,
+        onNext: _handlePasswordSet,
+        isLoading: isLoading,
+      ),
+      // 3: Gender
       GenderStep(onGenderSelected: _onGenderSelected),
+      // 4: Profile Details
+      ProfileDetailsStep(
+        nameController: _nameController,
+        dobController: _dobController,
+        onNext: () {
+          if (_gender == 'female') {
+            _nextPage();
+          } else {
+            _handleProfileComplete();
+          }
+        },
+      ),
     ];
 
     if (_gender == 'female') {
-      pages.addAll([
-        FemaleProfileStep(
-          nameController: _nameController,
-          emailController: _emailController,
-          passwordController: _passwordController,
-          dobController: _dobController,
-          onNext: _nextPage,
-        ),
+      // 5: Photo Verification
+      pages.add(
         FemaleVerificationStep(
-          onVerify: _handleSignup,
+          onVerify: _handleProfileComplete,
           isLoading: isLoading,
         ),
-      ]);
-    } else if (_gender == 'male') {
-      pages.addAll([
-        MaleNameStep(
-          nameController: _nameController,
-          onNext: _nextPage,
-        ),
-         MaleCredentialsStep(
-          emailController: _emailController,
-          passwordController: _passwordController,
-          onSignup: _handleSignup,
-          isLoading: isLoading,
-        ),
-      ]);
+      );
     }
 
-    return WillPopScope(
-      onWillPop: _onWillPop,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (_pageController.hasClients && _pageController.page! > 0) {
+          _previousPage();
+        } else {
+          Navigator.of(context).pop();
+        }
+      },
       child: Column(
         children: [
             // Custom App Bar for back navigation within steps
@@ -238,7 +306,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                         _previousPage();
                       } else {
                          // Or pop
-                        widget.onSwitchToLogin();
+                        widget.onSwitchToLogin(null);
                       }
                     },
                     color: AppColors.textPrimary,
@@ -246,7 +314,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                   const Spacer(),
                    if (_gender == null) // Show Login option only on first step
                       TextButton(
-                      onPressed: widget.onSwitchToLogin,
+                      onPressed: () => widget.onSwitchToLogin(null),
                       child: const Text(
                         'Sign In',
                         style: TextStyle(

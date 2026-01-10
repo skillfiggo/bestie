@@ -257,7 +257,7 @@ class _AdminBannerEditorScreenState extends ConsumerState<AdminBannerEditorScree
                   child: ListView.separated(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     itemCount: _ads.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
+                    separatorBuilder: (context, index) => const SizedBox(height: 8),
                     itemBuilder: (context, index) {
                       return ListTile(
                         tileColor: Colors.grey.shade50,

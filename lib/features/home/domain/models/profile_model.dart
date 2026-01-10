@@ -24,6 +24,9 @@ class ProfileModel {
   final List<String> galleryUrls;
   final String role;
   final String status; // 'active', 'suspended', 'banned'
+  final bool showOnlineStatus;
+  final bool showLastSeen;
+  final DateTime? lastActiveAt;
 
   const ProfileModel({
     required this.id,
@@ -51,6 +54,9 @@ class ProfileModel {
     this.galleryUrls = const [],
     this.role = 'user',
     this.status = 'active',
+    this.showOnlineStatus = true,
+    this.showLastSeen = true,
+    this.lastActiveAt,
   });
 
   factory ProfileModel.fromMap(Map<String, dynamic> map) {
@@ -80,6 +86,9 @@ class ProfileModel {
       galleryUrls: List<String>.from(map['gallery_urls'] ?? []),
       role: map['role'] ?? 'user',
       status: map['status'] ?? 'active',
+      showOnlineStatus: map['show_online_status'] ?? true,
+      showLastSeen: map['show_last_seen'] ?? true,
+      lastActiveAt: map['last_active_at'] != null ? DateTime.parse(map['last_active_at']) : null,
     );
   }
 }

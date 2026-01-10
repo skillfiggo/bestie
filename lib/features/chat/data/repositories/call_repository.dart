@@ -138,6 +138,33 @@ class CallRepository {
     return channel;
   }
 
+  /// Send a call summary message (Bypasses coin deduction)
+  Future<void> sendCallEndMessage({
+    required String chatId,
+    required String senderId,
+    required String receiverId,
+    required String mediaType,
+    required int durationSeconds,
+  }) async {
+    try {
+      final minutes = durationSeconds ~/ 60;
+      final seconds = durationSeconds % 60;
+      final durationStr = '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+      
+      await _client.from('messages').insert({
+        'chat_id': chatId,
+        'sender_id': senderId,
+        'receiver_id': receiverId,
+        'content': 'Ended a $mediaType call. Duration: $durationStr',
+        'message_type': 'text',
+        'status': 'sent',
+      });
+      debugPrint('📧 Call summary message inserted');
+    } catch (e) {
+      debugPrint('❌ Failed to send call summary message: $e');
+    }
+  }
+
   /// Send a missed call system message (Bypasses coin deduction)
   Future<void> sendMissedCallMessage({
     required String chatId,
@@ -195,5 +222,27 @@ class CallRepository {
         .order('created_at', ascending: false);
 
     return List<Map<String, dynamic>>.from(response as List);
+  }
+
+  /// Deduct coins from caller and pay diamonds to creator (60/40 Split)
+  Future<void> processEarningTransfer({
+    required String senderId,
+    required String receiverId,
+    required int amount,
+    required String type,
+  }) async {
+    try {
+      debugPrint('💰 Processing earning transfer: $amount coins from $senderId to $receiverId ($type)');
+      await _client.rpc('process_earning_transfer', params: {
+        'p_sender_id': senderId,
+        'p_receiver_id': receiverId,
+        'p_coin_amount': amount,
+        'p_transaction_type': type,
+      });
+      debugPrint('✅ Earning transfer processed successfully');
+    } catch (e) {
+      debugPrint('❌ Earning transfer failed: $e');
+      rethrow;
+    }
   }
 }

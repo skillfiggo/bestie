@@ -6,6 +6,7 @@ import 'package:bestie/features/admin/presentation/screens/admin_analytics_scree
 import 'package:bestie/features/admin/presentation/screens/admin_reports_screen.dart';
 import 'package:bestie/features/admin/presentation/screens/admin_user_management_screen.dart';
 import 'package:bestie/features/admin/presentation/screens/admin_broadcast_screen.dart';
+import 'package:bestie/features/admin/presentation/screens/admin_withdrawals_screen.dart';
 import 'package:bestie/features/home/domain/models/profile_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -124,6 +125,12 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                     MaterialPageRoute(builder: (_) => const AdminBannerEditorScreen()),
                   );
                   break;
+                case 'withdrawals':
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AdminWithdrawalsScreen()),
+                  );
+                  break;
               }
             },
             itemBuilder: (context) => [
@@ -187,38 +194,53 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                   ],
                 ),
               ),
+              const PopupMenuItem(
+                value: 'withdrawals',
+                child: Row(
+                  children: [
+                    Icon(Icons.payments, color: Colors.green, size: 20),
+                    SizedBox(width: 12),
+                    Text('Payout Requests'),
+                  ],
+                ),
+              ),
             ],
           ),
         ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : ListView.builder(
-              itemCount: _users.length,
-              itemBuilder: (context, index) {
-                final user = _users[index];
-                return ListTile(
-                  leading: CircleAvatar(
-                    backgroundImage: user.avatarUrl.isNotEmpty
-                        ? NetworkImage(user.avatarUrl)
-                        : null,
-                    child: user.avatarUrl.isEmpty
-                        ? const Icon(Icons.person)
-                        : null,
-                  ),
-                  title: Text(user.name),
-                  subtitle: Text('Status: ${user.status} • Role: ${user.role}'),
-                  trailing: user.id != ref.read(authRepositoryProvider).getCurrentUser()?.id
-                      ? Switch(
-                          value: user.status == 'active',
-                          activeThumbColor: Colors.green,
-                          inactiveThumbColor: Colors.red,
-                          inactiveTrackColor: Colors.red.shade100,
-                          onChanged: (_) => _toggleBanStatus(user),
-                        )
-                      : const Chip(label: Text('You')),
-                );
-              },
+          : RefreshIndicator(
+              onRefresh: _loadUsers,
+              color: Colors.green,
+              child: ListView.builder(
+                itemCount: _users.length,
+                physics: const AlwaysScrollableScrollPhysics(),
+                itemBuilder: (context, index) {
+                  final user = _users[index];
+                  return ListTile(
+                    leading: CircleAvatar(
+                      backgroundImage: user.avatarUrl.isNotEmpty
+                          ? NetworkImage(user.avatarUrl)
+                          : null,
+                      child: user.avatarUrl.isEmpty
+                          ? const Icon(Icons.person)
+                          : null,
+                    ),
+                    title: Text(user.name),
+                    subtitle: Text('Gender: ${user.gender} • Status: ${user.status} • Role: ${user.role}'),
+                    trailing: user.id != ref.read(authRepositoryProvider).getCurrentUser()?.id
+                        ? Switch(
+                            value: user.status == 'active',
+                            activeThumbColor: Colors.green,
+                            inactiveThumbColor: Colors.red,
+                            inactiveTrackColor: Colors.red.shade100,
+                            onChanged: (_) => _toggleBanStatus(user),
+                          )
+                        : const Chip(label: Text('You')),
+                  );
+                },
+              ),
             ),
     );
   }

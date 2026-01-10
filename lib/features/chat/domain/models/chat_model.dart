@@ -7,9 +7,16 @@ class ChatModel {
   final DateTime lastMessageTime;
   final int unreadCount;
   final bool isOnline;
+  final bool showOnlineStatus;
+  final bool showLastSeen;
   final bool isOfficial;
-  final int streakCount;
+  final int coinsSpent; // Total coins spent in this chat for streak
   final DateTime? lastStreakUpdate;
+  final DateTime? lastActiveAt;
+
+  /// Calculate streak temperature (0-100°C based on coins spent)
+  /// 5000 coins = 100°C
+  double get streakTemperature => (coinsSpent / 50).clamp(0, 100).toDouble();
 
   const ChatModel({
     required this.id,
@@ -20,9 +27,12 @@ class ChatModel {
     required this.lastMessageTime,
     this.unreadCount = 0,
     this.isOnline = false,
+    this.showOnlineStatus = true,
+    this.showLastSeen = true,
     this.isOfficial = false,
-    this.streakCount = 0,
+    this.coinsSpent = 0,
     this.lastStreakUpdate,
+    this.lastActiveAt,
   });
 
   factory ChatModel.fromMap(Map<String, dynamic> map, String currentUserId, {int unreadCount = 0}) {
@@ -30,9 +40,11 @@ class ChatModel {
     final isUser1 = map['user1_id'] == currentUserId;
     final otherUser = isUser1 ? map['profile2'] : map['profile1'];
 
+    final otherUserId = isUser1 ? map['user2_id'] : map['user1_id'];
+
     return ChatModel(
       id: map['id'],
-      otherUserId: isUser1 ? map['user2_id'] : map['user1_id'],
+      otherUserId: otherUserId,
       name: otherUser?['name'] ?? 'Unknown',
       imageUrl: otherUser?['avatar_url'] ?? '',
       lastMessage: map['last_message'] ?? '',
@@ -41,8 +53,13 @@ class ChatModel {
           : DateTime.fromMillisecondsSinceEpoch(0), // Fallback
       unreadCount: unreadCount,
       isOnline: otherUser?['is_online'] ?? false,
-      isOfficial: false,
-      streakCount: map['streak_count'] ?? 0,
+      showOnlineStatus: otherUser?['show_online_status'] ?? true,
+      showLastSeen: otherUser?['show_last_seen'] ?? true,
+      lastActiveAt: otherUser?['last_active_at'] != null 
+          ? DateTime.parse(otherUser['last_active_at']) 
+          : null,
+      isOfficial: otherUser?['role'] == 'system' || otherUserId == '00000000-0000-0000-0000-000000000001',
+      coinsSpent: map['coins_spent'] ?? 0,
       lastStreakUpdate: map['last_streak_update'] != null 
           ? DateTime.parse(map['last_streak_update']) 
           : null,

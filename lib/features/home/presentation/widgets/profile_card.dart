@@ -113,15 +113,15 @@ class ProfileCard extends StatelessWidget {
                 ),
 
                 // Online Indicator
-                if (profile.isOnline)
+                if (profile.isOnline && profile.showOnlineStatus)
                   Positioned(
                     top: 16,
                     right: 16,
                     child: Container(
-                      width: 36,
-                      height: 36,
+                      width: 14,
+                      height: 14,
                       decoration: BoxDecoration(
-                        color: Colors.greenAccent,
+                        color: const Color(0xFF00c853), // Standard Green
                         shape: BoxShape.circle,
                         border: Border.all(color: Colors.white, width: 2),
                       ),
@@ -159,22 +159,23 @@ class ProfileCard extends StatelessWidget {
                         Row(
                           children: [
                             Flexible(
-                              child: FittedBox(
-                                fit: BoxFit.scaleDown,
-                                alignment: Alignment.centerLeft,
-                                child: Text(
-                                  '${profile.name}, ${profile.age}',
-                                  style: const TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
+                                child: Row(
+                                  children: [
+                                    Text(
+                                      '${profile.name}, ${profile.age}',
+                                      style: const TextStyle(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    if (profile.isVerified) ...[
+                                      const SizedBox(width: 8),
+                                      const Icon(Icons.verified_rounded, color: Colors.blue, size: 24),
+                                    ],
+                                  ],
                                 ),
-                              ),
                             ),
-                            const SizedBox(width: 8),
-                            if (profile.isVerified)
-                              const Icon(Icons.verified_rounded, color: Color(0xFFFF5252), size: 24),
                           ],
                         ),
                       const SizedBox(height: 4),

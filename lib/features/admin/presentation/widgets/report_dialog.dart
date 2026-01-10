@@ -164,12 +164,16 @@ class _ReportDialogState extends ConsumerState<ReportDialog> {
                       borderRadius: BorderRadius.circular(12),
                       color: isSelected ? AppColors.primary.withValues(alpha: 0.05) : Colors.white,
                     ),
-                    child: RadioListTile<String>(
-                      value: reason['value'],
-                      groupValue: _selectedReason,
-                      onChanged: (value) {
-                        setState(() => _selectedReason = value);
-                      },
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                      leading: Radio<String>(
+                        value: reason['value'],
+                        groupValue: _selectedReason,
+                        activeColor: AppColors.primary,
+                        onChanged: (value) {
+                          setState(() => _selectedReason = value);
+                        },
+                      ),
                       title: Row(
                         children: [
                           Icon(
@@ -178,17 +182,21 @@ class _ReportDialogState extends ConsumerState<ReportDialog> {
                             color: isSelected ? AppColors.primary : Colors.grey.shade600,
                           ),
                           const SizedBox(width: 12),
-                          Text(
-                            reason['label'],
-                            style: TextStyle(
-                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                              color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                          Expanded(
+                            child: Text(
+                              reason['label'],
+                              style: TextStyle(
+                                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                                color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
                       ),
-                      activeColor: AppColors.primary,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                      onTap: () {
+                        setState(() => _selectedReason = reason['value']);
+                      },
                     ),
                   );
                 },

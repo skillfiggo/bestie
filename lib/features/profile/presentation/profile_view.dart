@@ -5,6 +5,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bestie/core/constants/app_colors.dart';
 import 'package:bestie/features/auth/data/providers/auth_providers.dart';
+import 'package:bestie/features/home/domain/models/profile_model.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:bestie/features/profile/presentation/screens/edit_profile_screen.dart';
 import 'package:bestie/features/profile/presentation/screens/recharge_coins_screen.dart';
@@ -152,6 +153,69 @@ class ProfileView extends ConsumerWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                // Verification Status Banner
+                                if (profile.gender.toLowerCase() == 'female' && !profile.isVerified)
+                                  Container(
+                                    width: double.infinity,
+                                    margin: const EdgeInsets.only(top: 12),
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    decoration: BoxDecoration(
+                                      color: profile.status == 'rejected' 
+                                          ? AppColors.error.withValues(alpha: 0.1) 
+                                          : AppColors.info.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: profile.status == 'rejected' 
+                                            ? AppColors.error.withValues(alpha: 0.3) 
+                                            : AppColors.info.withValues(alpha: 0.3),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          profile.status == 'rejected' ? Icons.error_outline : Icons.info_outline,
+                                          color: profile.status == 'rejected' ? AppColors.error : AppColors.info,
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            profile.status == 'rejected'
+                                                ? 'Your verification was rejected. Please upload a clear photo of yourself.'
+                                                : 'Your verification is currently being reviewed by our team.',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              color: profile.status == 'rejected' ? AppColors.error : AppColors.info,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ),
+                                        if (profile.status == 'rejected')
+                                          TextButton(
+                                            onPressed: () {
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (context) => EditProfileScreen(
+                                                    initialProfile: profile,
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                            child: const Text(
+                                              'Fix Now',
+                                              style: TextStyle(
+                                                color: AppColors.error,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 13,
+                                                decoration: TextDecoration.underline,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                const SizedBox(height: 12),
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
@@ -173,27 +237,10 @@ class ProfileView extends ConsumerWidget {
                                             ),
                                           ),
                                           const SizedBox(width: 6),
-                                          if (profile.isVerified)
+                                          if (profile.isVerified) ...[
+                                            const SizedBox(width: 6),
                                             const Icon(Icons.verified, color: Colors.blue, size: 20),
-                                          const SizedBox(width: 6),
-                                          Container(
-                                            padding: const EdgeInsets.all(4),
-                                            decoration: BoxDecoration(
-                                              color: profile.gender.toLowerCase() == 'female' 
-                                                  ? Colors.pink.shade50 
-                                                  : Colors.blue.shade50,
-                                              borderRadius: BorderRadius.circular(6),
-                                            ),
-                                            child: Icon(
-                                              profile.gender.toLowerCase() == 'female' 
-                                                  ? Icons.female 
-                                                  : Icons.male,
-                                              color: profile.gender.toLowerCase() == 'female' 
-                                                  ? Colors.pink
-                                                  : Colors.blue.shade700,
-                                              size: 18,
-                                            ),
-                                          ),
+                                          ],
                                           const SizedBox(width: 8), // Add spacing before button
                                         ],
                                       ),
@@ -225,21 +272,39 @@ class ProfileView extends ConsumerWidget {
                                       const SnackBar(content: Text('ID copied to clipboard')),
                                     );
                                   },
-                                  child: Row(
-                                    children: [
-                                      Text(
-                                        'ID: ${profile.bestieId.isNotEmpty ? profile.bestieId : profile.id.substring(0, 8)}',
-                                        style: const TextStyle(
-                                          color: Colors.grey,
-                                          fontSize: 13,
-                                        ),
+                                child: Row(
+                                  children: [
+                                    Text(
+                                      'ID: ${profile.bestieId.isNotEmpty ? profile.bestieId : profile.id.substring(0, 8)}',
+                                      style: const TextStyle(
+                                        color: Colors.grey,
+                                        fontSize: 13,
                                       ),
-                                      const SizedBox(width: 4),
-                                      const FaIcon(FontAwesomeIcons.copy, size: 14, color: Colors.grey),
-                                    ],
-                                  ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    const FaIcon(FontAwesomeIcons.copy, size: 14, color: Colors.grey),
+                                  ],
                                 ),
-                                  const SizedBox(height: 12),
+                              ),
+                              const SizedBox(height: 12),
+                              // Location Row (only show if location is set)
+                              if (profile.locationName.isNotEmpty) ...[
+                                Row(
+                                  children: [
+                                    Icon(Icons.location_on_rounded, size: 14, color: Colors.grey.shade400),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      profile.locationName,
+                                      style: TextStyle(
+                                        color: Colors.grey.shade600,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                              ],
                                 // Stats Row
                                 Row(
                                   children: [
@@ -261,7 +326,7 @@ class ProfileView extends ConsumerWidget {
                                           return followerCountAsync.when(
                                             data: (count) => _buildStat(count.toString(), 'Followers'),
                                             loading: () => _buildStat('...', 'Followers'),
-                                            error: (_, __) => _buildStat('0', 'Followers'),
+                                            error: (error, stackTrace) => _buildStat('0', 'Followers'),
                                           );
                                         },
                                       ),
@@ -285,7 +350,7 @@ class ProfileView extends ConsumerWidget {
                                           return followingCountAsync.when(
                                             data: (count) => _buildStat(count.toString(), 'Following'),
                                             loading: () => _buildStat('...', 'Following'),
-                                            error: (_, __) => _buildStat('0', 'Following'),
+                                            error: (error, stackTrace) => _buildStat('0', 'Following'),
                                           );
                                         },
                                       ),
@@ -309,7 +374,7 @@ class ProfileView extends ConsumerWidget {
                                           return friendsCountAsync.when(
                                             data: (count) => _buildStat(count.toString(), 'Friends'),
                                             loading: () => _buildStat('...', 'Friends'),
-                                            error: (_, __) => _buildStat('0', 'Friends'),
+                                            error: (error, stackTrace) => _buildStat('0', 'Friends'),
                                           );
                                         },
                                       ),
@@ -333,7 +398,7 @@ class ProfileView extends ConsumerWidget {
                                           return bestiesCountAsync.when(
                                             data: (count) => _buildStat(count.toString(), 'Bestie'),
                                             loading: () => _buildStat('...', 'Bestie'),
-                                            error: (_, __) => _buildStat('0', 'Bestie'),
+                                            error: (error, stackTrace) => _buildStat('0', 'Bestie'),
                                           );
                                         },
                                       ),
@@ -511,17 +576,96 @@ class ProfileView extends ConsumerWidget {
                 children: [
                   _buildAboutTab(profile),
                   _buildMomentsTab(ref, profile.id),
-                  const Center(child: Text('Gallery Content')), // Placeholder for gallery
-                ],
-              );
-            },
+                  _buildGalleryTab(profile),
+              ],
+            );
+          },
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, __) => const Center(child: Text('Error loading profile content')),
+            error: (error, stackTrace) => const Center(child: Text('Error loading profile content')),
           ),
         ),
       ),
     );
   }
+
+  Widget _buildGalleryTab(ProfileModel profile) {
+    if (profile.galleryUrls.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.photo_library_outlined, size: 64, color: Colors.grey),
+            SizedBox(height: 16),
+            Text(
+              'No gallery images yet',
+              style: TextStyle(color: Colors.grey, fontSize: 16),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return GridView.builder(
+      padding: const EdgeInsets.all(12),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+        childAspectRatio: 1,
+      ),
+      itemCount: profile.galleryUrls.length,
+      itemBuilder: (context, index) {
+        final url = profile.galleryUrls[index];
+        return GestureDetector(
+          onTap: () => _showFullScreenImage(context, url),
+          child: Hero(
+            tag: url,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.network(
+                url,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  color: Colors.grey.shade200,
+                  child: const Icon(Icons.error_outline, color: Colors.grey),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showFullScreenImage(BuildContext context, String imageUrl) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => Scaffold(
+          backgroundColor: Colors.black,
+          appBar: AppBar(
+            backgroundColor: Colors.black,
+            iconTheme: const IconThemeData(color: Colors.white),
+            elevation: 0,
+          ),
+          body: Center(
+            child: InteractiveViewer(
+              child: Hero(
+                tag: imageUrl,
+                child: Image.network(
+                  imageUrl,
+                  fit: BoxFit.contain,
+                  width: double.infinity,
+                  height: double.infinity,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
 
   Widget _buildMomentsTab(WidgetRef ref, String userId) {
     final momentsAsync = ref.watch(userMomentsProvider(userId));
@@ -573,7 +717,7 @@ class ProfileView extends ConsumerWidget {
     );
   }
 
-  Widget _buildAboutTab(profile) {
+  Widget _buildAboutTab(ProfileModel? profile) {
     if (profile == null) return const SizedBox.shrink();
     
      return SingleChildScrollView(
@@ -727,7 +871,7 @@ class ProfileView extends ConsumerWidget {
                   final success = await ref.read(authRepositoryProvider).dailyCheckIn(profile.id);
                   if (success) {
                     // Invalidate provider to refresh data
-                    ref.refresh(userProfileProvider); 
+                    ref.invalidate(userProfileProvider); 
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('🎉 +5 Free Messages claimed!')),

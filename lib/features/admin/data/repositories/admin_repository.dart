@@ -81,8 +81,19 @@ class AdminRepository {
   /// Approve verification
   Future<void> approveVerification(String userId) async {
     try {
-      await _client.from('profiles').update({'is_verified': true}).eq('id', userId);
+      debugPrint('Approving verification for user: $userId');
+      final response = await _client.from('profiles').update({
+        'is_verified': true,
+        'status': 'active',
+      }).eq('id', userId).select();
+
+      if ((response as List).isEmpty) {
+        debugPrint('Failed to approve: No rows updated. Check RLS policies.');
+        throw Exception('Failed to approve verification: No profile updated. You may not have admin privileges.');
+      }
+      debugPrint('Successfully approved user: $userId');
     } catch (e) {
+      debugPrint('Error in approveVerification: $e');
       throw Exception('Failed to approve verification: $e');
     }
   }
@@ -90,10 +101,20 @@ class AdminRepository {
   /// Reject verification
   Future<void> rejectVerification(String userId) async {
     try {
+      debugPrint('Rejecting verification for user: $userId');
       // Clear the verification photo so they have to re-upload
-      // We could also add a 'rejection_reason' column later
-      await _client.from('profiles').update({'verification_photo_url': ''}).eq('id', userId);
+      final response = await _client.from('profiles').update({
+        'verification_photo_url': '',
+        'status': 'rejected',
+      }).eq('id', userId).select();
+
+      if ((response as List).isEmpty) {
+        debugPrint('Failed to reject: No rows updated. Check RLS policies.');
+        throw Exception('Failed to reject verification: No profile updated. You may not have admin privileges.');
+      }
+      debugPrint('Successfully rejected user: $userId');
     } catch (e) {
+      debugPrint('Error in rejectVerification: $e');
       throw Exception('Failed to reject verification: $e');
     }
   }

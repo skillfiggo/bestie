@@ -13,6 +13,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:bestie/features/chat/data/repositories/call_repository.dart';
 import 'package:bestie/features/profile/presentation/screens/user_profile_screen.dart';
 import 'package:bestie/features/admin/presentation/widgets/report_dialog.dart';
+import 'package:bestie/features/auth/data/providers/auth_providers.dart';
 
 class ChatDetailScreen extends ConsumerStatefulWidget {
   final ChatModel chat;
@@ -37,16 +38,8 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     super.initState();
     // Mark messages as read
     ref.read(chatRepositoryProvider).markMessagesAsRead(widget.chat.id).then((_) {
-       // Refresh chat list to update badges/counts
+       // Refresh chat list to update badges/counts and total unread count
        ref.invalidate(chatListProvider);
-       
-       // Decrement global unread count based on the snapshot we have
-       // We ensure we don't go below zero
-       if (widget.chat.unreadCount > 0) {
-         ref.read(totalUnreadMessagesProvider.notifier).update((state) {
-            return (state - widget.chat.unreadCount).clamp(0, 999);
-         });
-       }
     });
     
     // Clear any active notification snackbars when entering the chat
@@ -91,6 +84,14 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     // But we can trigger a side effect?
     
     _scrollController.dispose();
+    
+    // Clear current chat ID so notifications can play when we are not in this chat
+    // We use Future.microtask to avoid modifying providers during dispose directly if needed,
+    // though for StateProvider it's usually acceptable if done carefully.
+    Future.microtask(() {
+      ref.read(currentChatIdProvider.notifier).state = null;
+    });
+    
     super.dispose();
   }
   
@@ -161,19 +162,19 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   void _handleClearChat() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Clear Chat'),
         content: const Text(
           'Are you sure you want to clear this chat? This will remove all messages for everyone.',
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () async {
-              Navigator.pop(context); // Close dialog
+              Navigator.pop(dialogContext); // Close dialog
               try {
                 await ref.read(chatRepositoryProvider).clearChatMessages(widget.chat.id);
                 // Refresh messages
@@ -251,6 +252,18 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       return;
     }
 
+    // Check gender for billing disclosure
+    final currentGender = ref.read(userProfileProvider).value?.gender ?? 'male';
+    
+    if (currentGender == 'male') {
+       _showCallCostDialog(context, isVideo: isVideo);
+       return;
+    }
+
+    _performStartCall(isVideo: isVideo);
+  }
+
+  Future<void> _performStartCall({required bool isVideo}) async {
     setState(() {
       _isStartingCall = true;
     });
@@ -330,8 +343,141 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     }
   }
 
+  void _showCallCostDialog(BuildContext context, {required bool isVideo}) {
+    final cost = isVideo ? 200 : 100;
+    final type = isVideo ? 'Video Call' : 'Voice Call';
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: Colors.white,
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: isVideo ? Colors.green.shade50 : Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                child: Icon(
+                  isVideo ? Icons.videocam_rounded : Icons.phone_rounded,
+                  color: isVideo ? Colors.green : Colors.blue,
+                  size: 48,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Ready for a $type?',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.orange.shade100),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.monetization_on_rounded, color: Colors.orange, size: 20),
+                    const SizedBox(width: 8),
+                    RichText(
+                      text: TextSpan(
+                        style: const TextStyle(fontSize: 15, color: AppColors.textPrimary),
+                        children: [
+                          TextSpan(
+                            text: '$cost Coins',
+                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.orange),
+                          ),
+                          const TextSpan(text: ' / minute'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 32),
+              Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: const Center(
+                          child: Text(
+                            'Cancel',
+                            style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold, fontSize: 16),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        Navigator.pop(context);
+                        _performStartCall(isVideo: isVideo);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: isVideo 
+                              ? [const Color(0xFF00c853), const Color(0xFF6CC449)]
+                              : [const Color(0xFF01579b), const Color(0xFF0277bd)],
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: const Center(
+                          child: Text(
+                            'Call Now',
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Automatically mark new messages as read when they arrive while viewing the chat
+    ref.listen(chatMessagesProvider(widget.chat.id), (previous, next) {
+       if (next.hasValue) {
+          final unreadExists = next.value!.any((m) => m.senderId != currentUserId && m.status != MessageStatus.read);
+          if (unreadExists) {
+             ref.read(chatRepositoryProvider).markMessagesAsRead(widget.chat.id).then((_) {
+                ref.invalidate(chatListProvider);
+             });
+          }
+       }
+    });
+
     final messagesAsync = ref.watch(chatMessagesProvider(widget.chat.id));
 
     return Scaffold(
@@ -349,23 +495,20 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                 CircleAvatar(
                   radius: 20,
                   backgroundColor: widget.chat.isOfficial 
-                      ? Colors.amber 
+                      ? Colors.transparent 
                       : Colors.grey.shade200,
                   backgroundImage: widget.chat.isOfficial 
-                      ? null 
+                      ? const AssetImage('assets/images/official_team.png') as ImageProvider
                       : (widget.chat.imageUrl.isNotEmpty ? NetworkImage(widget.chat.imageUrl) : null),
-                  child: widget.chat.isOfficial
-                      ? const Icon(Icons.verified_user_rounded, 
-                          color: Colors.white, size: 24)
-                      : (widget.chat.imageUrl.isEmpty ? Text(widget.chat.name[0]) : null),
+                  child: (widget.chat.imageUrl.isEmpty && !widget.chat.isOfficial) ? Text(widget.chat.name[0]) : null,
                 ),
-                if (widget.chat.isOnline && !widget.chat.isOfficial)
+                if (widget.chat.isOnline && widget.chat.showOnlineStatus && !widget.chat.isOfficial)
                   Positioned(
                     bottom: 0,
                     right: 0,
                     child: Container(
-                      width: 12,
-                      height: 12,
+                      width: 14,
+                      height: 14,
                       decoration: BoxDecoration(
                         color: AppColors.success,
                         shape: BoxShape.circle,
@@ -397,33 +540,79 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                         const SizedBox(width: 4),
                         const Icon(Icons.verified, color: Colors.blue, size: 16),
                       ],
-                      if (widget.chat.streakCount > 0 && widget.chat.lastStreakUpdate != null) ...[
+                      if (widget.chat.coinsSpent > 0) ...[
                         const SizedBox(width: 8),
                         Builder(builder: (context) {
-                          final now = DateTime.now();
-                          final last = widget.chat.lastStreakUpdate!.toLocal();
-                          final diff = DateTime(now.year, now.month, now.day)
-                              .difference(DateTime(last.year, last.month, last.day))
-                              .inDays;
-                          
-                          if (diff == 0) {
-                             return Text('🔥 ${widget.chat.streakCount}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16));
-                          } else if (diff == 1) {
-                             return Text('⌛ ${widget.chat.streakCount}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16));
-                          }
-                          return const SizedBox.shrink();
+                          final temp = widget.chat.streakTemperature;
+                          final isBestie = temp >= 100;
+                          final emoji = isBestie ? '🔥' : (temp >= 50 ? '🌡️' : '❄️');
+                          return Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text('$emoji ${temp.toInt()}°C', 
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                              if (isBestie) ...[
+                                const SizedBox(width: 4),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.pink.shade50,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: Colors.pink.shade100),
+                                  ),
+                                  child: const Text(
+                                    'Besties',
+                                    style: TextStyle(
+                                      color: Colors.pink,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          );
                         }),
                       ],
                     ],
                   ),
-                  Text(
-                    widget.chat.isOnline ? 'Online' : 'Offline',
-                    style: TextStyle(
-                      color: widget.chat.isOnline 
-                          ? AppColors.success 
-                          : AppColors.textSecondary,
-                      fontSize: 12,
-                    ),
+                  Builder(
+                    builder: (context) {
+                      String statusText = '';
+                      Color statusColor = AppColors.textSecondary;
+
+                      if (widget.chat.isOnline && widget.chat.showOnlineStatus) {
+                        statusText = 'Online';
+                        statusColor = AppColors.success;
+                      } else if (widget.chat.showLastSeen && widget.chat.lastActiveAt != null) {
+                        final diff = DateTime.now().difference(widget.chat.lastActiveAt!);
+                        if (diff.inMinutes < 1) {
+                          statusText = 'Active just now';
+                        } else if (diff.inMinutes < 60) {
+                          statusText = 'Active ${diff.inMinutes}m ago';
+                        } else if (diff.inHours < 24) {
+                          statusText = 'Active ${diff.inHours}h ago';
+                        } else {
+                          statusText = 'Active ${DateFormat('MMM d').format(widget.chat.lastActiveAt!)}';
+                        }
+                      } else if (widget.chat.isOnline && !widget.chat.showOnlineStatus) {
+                          // If they are online but hiding it, we don't show "Online".
+                          // If they also hide last seen, we show nothing or "Offline" (if we want to be explicit).
+                          statusText = ''; 
+                      } else {
+                        statusText = 'Offline';
+                      }
+
+                      if (statusText.isEmpty) return const SizedBox.shrink();
+
+                      return Text(
+                        statusText,
+                        style: TextStyle(
+                          color: statusColor,
+                          fontSize: 12,
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -462,16 +651,17 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                 value: 'Clear Chat',
                 child: Text('Clear Chat'),
               ),
-              const PopupMenuItem(
-                value: 'Report',
-                child: Row(
-                  children: [
-                    Icon(Icons.flag, color: Colors.orange, size: 20),
-                    SizedBox(width: 8),
-                    Text('Report User'),
-                  ],
+              if (!widget.chat.isOfficial)
+                const PopupMenuItem(
+                  value: 'Report',
+                  child: Row(
+                    children: [
+                      Icon(Icons.flag, color: Colors.orange, size: 20),
+                      SizedBox(width: 8),
+                      Text('Report User'),
+                    ],
+                  ),
                 ),
-              ),
             ],
           ),
         ],
@@ -548,12 +738,14 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
               ),
             ),
             // Input field
-            ChatInput(
-              onSendMessage: _handleSendMessage,
-              onVideoCallPressed: () => _handleStartCall(isVideo: true),
-              onVoiceCallPressed: () => _handleStartCall(isVideo: false),
-              onSendVoiceNote: _handleSendVoiceNote,
-            ),
+            widget.chat.isOfficial
+                ? const SizedBox.shrink()
+                : ChatInput(
+                    onSendMessage: _handleSendMessage,
+                    onVideoCallPressed: () => _handleStartCall(isVideo: true),
+                    onVoiceCallPressed: () => _handleStartCall(isVideo: false),
+                    onSendVoiceNote: _handleSendVoiceNote,
+                  ),
           ],
         ),
       ),

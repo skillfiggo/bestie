@@ -127,13 +127,29 @@ class _HomeViewState extends ConsumerState<HomeView> {
     });
 
     try {
+      // 1. Get current user's gender to filter by opposite
+      final userProfile = ref.read(userProfileProvider).valueOrNull;
+      String? targetGender;
+      
+      if (userProfile != null) {
+        if (userProfile.gender == 'male') {
+          targetGender = 'female';
+        } else if (userProfile.gender == 'female') {
+          targetGender = 'male';
+        }
+      }
+
       // Fetch both Recommended and Newcomers in parallel
       final results = await Future.wait([
         ref.read(profileRepositoryProvider).getDiscoveryProfiles(
+          gender: targetGender,
           minAge: _ageRange.start.round(),
           maxAge: _ageRange.end.round(),
         ),
-        ref.read(profileRepositoryProvider).getNewcomerProfiles(limit: 50),
+        ref.read(profileRepositoryProvider).getNewcomerProfiles(
+          gender: targetGender,
+          limit: 50,
+        ),
       ]);
       
       if (mounted) {

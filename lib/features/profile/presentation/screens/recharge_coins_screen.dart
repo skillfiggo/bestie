@@ -1,19 +1,42 @@
+
+import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bestie/core/constants/app_colors.dart';
+import 'package:bestie/core/services/payment_service.dart';
+import 'package:bestie/core/services/iap_service.dart';
+import 'package:bestie/features/profile/data/repositories/profile_repository.dart';
+import 'package:bestie/features/auth/data/providers/auth_providers.dart';
+import 'package:in_app_purchase/in_app_purchase.dart';
 
-class RechargeCoinsScreen extends StatefulWidget {
+class RechargeCoinsScreen extends ConsumerStatefulWidget {
   const RechargeCoinsScreen({super.key});
 
   @override
-  State<RechargeCoinsScreen> createState() => _RechargeCoinsScreenState();
+  ConsumerState<RechargeCoinsScreen> createState() => _RechargeCoinsScreenState();
 }
 
-class _RechargeCoinsScreenState extends State<RechargeCoinsScreen> {
+class _RechargeCoinsScreenState extends ConsumerState<RechargeCoinsScreen> {
   int? _selectedPackage;
+  bool _isLoading = false;
+  bool _isStoreAvailable = false;
+  List<ProductDetails> _storeProducts = [];
 
-  final List<Map<String, dynamic>> _coinPackages = [
-    {'coins': 1000, 'price': 1800, 'bonus': 0},
+  // Define Google Play Product IDs and their corresponding Coin values
+  // This allows for "different coin rates" (Coins per Price) than Paystack.
+  static const Map<String, int> _googleProductCoins = {
+    'bestie_coins_tier1': 1200,   // Included 200 bonus
+    'bestie_coins_tier2': 2000,
+    'bestie_coins_tier3': 5000,
+    'bestie_coins_tier4': 10000,
+  };
+
+  // Fallback (Paystack) Packages
+  final List<Map<String, dynamic>> _paystackPackages = [
+    {'coins': 1000, 'price': 1800, 'bonus': 200},
     {'coins': 2100, 'price': 3500, 'bonus': 0},
     {'coins': 5200, 'price': 8500, 'bonus': 0},
     {'coins': 10500, 'price': 17000, 'bonus': 0},
@@ -25,7 +48,76 @@ class _RechargeCoinsScreenState extends State<RechargeCoinsScreen> {
     decimalDigits: 0,
   );
 
-  void _handlePurchase() {
+  @override
+  void initState() {
+    super.initState();
+    _initializeIAP();
+  }
+
+  Future<void> _initializeIAP() async {
+    // Only check for IAP on mobile
+    if (!Platform.isAndroid && !Platform.isIOS) return;
+
+    final iapService = ref.read(iapServiceProvider);
+    final available = await iapService.isAvailable();
+
+    if (available) {
+      // 1. Setup specific listeners for this screen
+      iapService.onPurchaseUpdated = _handleIAPSuccess;
+      iapService.onError = (error) {
+        if (mounted) {
+           ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Google Play Error: $error'), backgroundColor: AppColors.error),
+          );
+          setState(() => _isLoading = false);
+        }
+      };
+
+      // 2. Load Products
+      try {
+        final products = await iapService.loadProducts(_googleProductCoins.keys.toSet());
+        // Sort products by price if possible
+        products.sort((a, b) => a.id.compareTo(b.id));
+
+        if (mounted) {
+          setState(() {
+            _isStoreAvailable = true;
+            _storeProducts = products;
+          });
+        }
+      } catch (e) {
+        debugPrint("Error loading IAP products: $e");
+      }
+    }
+  }
+  
+  void _handleIAPSuccess(PurchaseDetails purchase) async {
+    // Purchase verified by Service.
+    // UI Feedback
+    if (mounted) {
+       setState(() => _isLoading = false);
+       ref.invalidate(userProfileProvider); // Refresh balance
+       
+       final coins = _googleProductCoins[purchase.productID] ?? 0;
+       ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Successfully purchased $coins coins!'),
+            backgroundColor: AppColors.success,
+          ),
+       );
+       Navigator.pop(context);
+    }
+  }
+
+  @override
+  void dispose() {
+    // Clean up callbacks
+    // Ideally we might want to keep the subscription alive globally, 
+    // but for this screen-specific logic we can just detach our specific callbacks
+    super.dispose();
+  }
+
+  Future<void> _handlePurchase() async {
     if (_selectedPackage == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -36,24 +128,105 @@ class _RechargeCoinsScreenState extends State<RechargeCoinsScreen> {
       return;
     }
 
-    final package = _coinPackages[_selectedPackage!];
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Processing purchase of ${package['coins']} coins...'),
-        backgroundColor: AppColors.success,
-      ),
-    );
-    
-    // TODO: Implement actual payment processing
-    Future.delayed(const Duration(seconds: 2), () {
+    if (_isStoreAvailable && _storeProducts.isNotEmpty) {
+      // Handle Google/Apple IAP
+      await _initiateIAPPurchase();
+    } else {
+      // Handle Paystack
+      await _initiatePaystackPurchase();
+    }
+  }
+
+  Future<void> _initiateIAPPurchase() async {
+    setState(() => _isLoading = true);
+    try {
+      final product = _storeProducts[_selectedPackage!];
+      await ref.read(iapServiceProvider).buyProduct(product);
+      // The process continues in `_handleIAPSuccess`
+    } catch (e) {
+      setState(() => _isLoading = false);
       if (mounted) {
-        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to start purchase: $e')),
+        );
       }
-    });
+    }
+  }
+
+  Future<void> _initiatePaystackPurchase() async {
+    final package = _paystackPackages[_selectedPackage!];
+    final amount = package['price'] as int;
+    final coinsToAdd = (package['coins'] as int) + (package['bonus'] as int);
+
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null || user.email == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('User email not found. Please update profile.')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      // 1. Initiate Charge on Client
+      final reference = await ref.read(paymentServiceProvider).chargeCard(
+        context: context,
+        amount: amount,
+        email: user.email!,
+      );
+
+      if (reference != null && mounted) {
+        // 2. Verify Charge on Server
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Verifying payment...')),
+        );
+        
+        final success = await ref.read(paymentServiceProvider).verifyPayment(
+          context: context,
+          reference: reference,
+        );
+        
+        if (success && mounted) {
+          ref.invalidate(userProfileProvider);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Successfully purchased $coinsToAdd coins!'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+          Navigator.pop(context);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Purchase process failed: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<int> _fetchCurrentBalance() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user != null) {
+        final profile = await ref.read(profileRepositoryProvider).getProfileById(user.id);
+        return profile?.coins ?? 0;
+    }
+    return 0;
   }
 
   @override
   Widget build(BuildContext context) {
+    // Determine which list to show
+    final showIAP = _isStoreAvailable && _storeProducts.isNotEmpty;
+    final itemCount = showIAP ? _storeProducts.length : _paystackPackages.length;
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -97,15 +270,20 @@ class _RechargeCoinsScreenState extends State<RechargeCoinsScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.monetization_on, color: Colors.white, size: 32),
+                    const Icon(Icons.monetization_on, color: Colors.white, size: 32),
                     const SizedBox(width: 8),
-                    const Text(
-                      '240',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 48,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    FutureBuilder<int>(
+                      future: _fetchCurrentBalance(),
+                      builder: (context, snapshot) {
+                        return Text(
+                          snapshot.hasData ? '${snapshot.data}' : '...',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 48,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        );
+                      }
                     ),
                   ],
                 ),
@@ -120,16 +298,37 @@ class _RechargeCoinsScreenState extends State<RechargeCoinsScreen> {
             ),
           ),
           
+          if (showIAP)
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Text("Google Play Store", style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+            ),
+
           // Packages List
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.all(16),
-              itemCount: _coinPackages.length,
+              itemCount: itemCount,
               itemBuilder: (context, index) {
-                final package = _coinPackages[index];
+                // Determine data for this item based on source (IAP vs Paystack)
+                String displayPrice;
+                int coinsAmount;
+                int bonusAmount = 0;
+
+                if (showIAP) {
+                   final product = _storeProducts[index];
+                   displayPrice = product.price; // e.g. "₦2,000" or "$2.99" from Store
+                   coinsAmount = _googleProductCoins[product.id] ?? 0;
+                   // We don't have explicit bonus logic for IAP unless we map it, assuming 0 for now
+                } else {
+                   final package = _paystackPackages[index];
+                   displayPrice = _currencyFormat.format(package['price']);
+                   coinsAmount = package['coins'] as int;
+                   bonusAmount = package['bonus'] as int;
+                }
+
                 final isSelected = _selectedPackage == index;
-                final hasBonus = package['bonus'] > 0;
-                final formattedPrice = _currencyFormat.format(package['price']);
+                final totalCoins = coinsAmount + bonusAmount;
 
                 return GestureDetector(
                   onTap: () {
@@ -177,14 +376,14 @@ class _RechargeCoinsScreenState extends State<RechargeCoinsScreen> {
                                 child: Row(
                                   children: [
                                     Text(
-                                      '${package['coins']} Coins',
+                                      '$coinsAmount Coins',
                                       style: const TextStyle(
                                         fontSize: 18,
                                         fontWeight: FontWeight.bold,
                                         color: AppColors.textPrimary,
                                       ),
                                     ),
-                                    if (hasBonus) ...[
+                                    if (bonusAmount > 0) ...[
                                       const SizedBox(width: 8),
                                       Container(
                                         padding: const EdgeInsets.symmetric(
@@ -194,23 +393,25 @@ class _RechargeCoinsScreenState extends State<RechargeCoinsScreen> {
                                         decoration: BoxDecoration(
                                           color: AppColors.primary,
                                           borderRadius: BorderRadius.circular(4),
-                                        ),
-                                        child: Text(
-                                          '+${package['bonus']} Bonus',
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.bold,
                                           ),
-                                        ),
+                                          child: Text(
+                                            '+$bonusAmount',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
                                       ),
                                     ],
                                   ],
                                 ),
                               ),
-                              if (hasBonus)
+                              if (bonusAmount > 0 || showIAP) // For IAP we might show description
                                 Text(
-                                  'Total: ${package['coins'] + package['bonus']} coins',
+                                  showIAP ? '${_storeProducts[index].description}' : 'Total: $totalCoins coins',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
                                     color: Colors.grey.shade600,
                                     fontSize: 12,
@@ -221,7 +422,7 @@ class _RechargeCoinsScreenState extends State<RechargeCoinsScreen> {
                         ),
                         // Price
                         Text(
-                          formattedPrice,
+                          displayPrice,
                           style: const TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
@@ -254,7 +455,7 @@ class _RechargeCoinsScreenState extends State<RechargeCoinsScreen> {
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton(
-                  onPressed: _handlePurchase,
+                  onPressed: _isLoading ? null : _handlePurchase,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
@@ -263,10 +464,20 @@ class _RechargeCoinsScreenState extends State<RechargeCoinsScreen> {
                     ),
                     elevation: 0,
                   ),
-                  child: Text(
+                  child: _isLoading 
+                    ? const SizedBox(
+                        height: 24, 
+                        width: 24, 
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                      )
+                    : Text(
                     _selectedPackage == null
                         ? 'Select a Package'
-                        : 'Purchase for ${_currencyFormat.format(_coinPackages[_selectedPackage!]['price'])}',
+                        : 'Purchase for ${
+                           showIAP 
+                           ? _storeProducts[_selectedPackage!].price
+                           : _currencyFormat.format(_paystackPackages[_selectedPackage!]['price'])
+                        }', 
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,

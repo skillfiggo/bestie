@@ -19,6 +19,7 @@ class NearbyRepository {
   Future<List<ProfileModel>> getNearbyProfiles({
     required double latitude,
     required double longitude,
+    String? targetGender,
     double radiusKm = 50.0,
   }) async {
     final response = await _client.rpc(
@@ -27,6 +28,7 @@ class NearbyRepository {
         'lat': latitude,
         'long': longitude,
         'radius_km': radiusKm,
+        'target_gender': targetGender,
       },
     );
 

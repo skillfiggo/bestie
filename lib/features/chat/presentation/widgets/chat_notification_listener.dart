@@ -65,10 +65,8 @@ class _ChatNotificationListenerState extends ConsumerState<ChatNotificationListe
     
     // 3. Fetch sender details for notification
     try {
-      // Increment global unread count
+      // Refresh chat list to update per-chat badges and total unread count
       if (mounted) {
-        ref.read(totalUnreadMessagesProvider.notifier).state++;
-        // Refresh chat list to update per-chat badges
         ref.invalidate(chatListProvider);
       }
 
@@ -124,7 +122,7 @@ class _ChatNotificationListenerState extends ConsumerState<ChatNotificationListe
         ),
       );
     } catch (e) {
-      print('Error handling chat notification: $e');
+      debugPrint('Error handling chat notification: $e');
     }
   }
   
@@ -157,7 +155,7 @@ class _ChatNotificationListenerState extends ConsumerState<ChatNotificationListe
          );
        }
      } catch (e) {
-       print('Error navigating to chat: $e');
+       debugPrint('Error navigating to chat: $e');
      }
   }
 

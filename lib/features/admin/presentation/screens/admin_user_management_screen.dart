@@ -5,6 +5,7 @@ import 'package:bestie/core/constants/app_colors.dart';
 import 'package:bestie/features/admin/data/repositories/admin_repository.dart';
 import 'package:bestie/features/home/domain/models/profile_model.dart';
 import 'package:bestie/features/profile/presentation/screens/user_profile_screen.dart';
+import 'package:bestie/features/admin/data/repositories/analytics_repository.dart';
 import 'dart:async';
 
 class AdminUserManagementScreen extends ConsumerStatefulWidget {
@@ -20,6 +21,8 @@ class _AdminUserManagementScreenState extends ConsumerState<AdminUserManagementS
   List<ProfileModel> _users = [];
   bool _isLoading = false;
   String _searchQuery = '';
+  Map<String, int> _genderDistribution = {'male': 0, 'female': 0, 'other': 0};
+  bool _isStatsLoading = true;
 
   @override
   void initState() {
@@ -36,6 +39,7 @@ class _AdminUserManagementScreenState extends ConsumerState<AdminUserManagementS
 
   Future<void> _loadUsers() async {
     setState(() => _isLoading = true);
+    _loadGenderStats(); // Load stats in background or alongside
     try {
       final repo = ref.read(adminRepositoryProvider);
       List<ProfileModel> results;
@@ -59,6 +63,21 @@ class _AdminUserManagementScreenState extends ConsumerState<AdminUserManagementS
           SnackBar(content: Text('Error: $e')),
         );
       }
+    }
+  }
+
+  Future<void> _loadGenderStats() async {
+    try {
+      // AnalyticsRepository is also available via analyticsRepositoryProvider
+      final stats = await ref.read(analyticsRepositoryProvider).getGenderDistribution();
+      if (mounted) {
+        setState(() {
+          _genderDistribution = stats;
+          _isStatsLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Failed to load gender stats: $e');
     }
   }
 
@@ -110,8 +129,13 @@ class _AdminUserManagementScreenState extends ConsumerState<AdminUserManagementS
           'User Management',
           style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
         ),
-        backgroundColor: Colors.white,
-        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: AppColors.primary),
+            onPressed: _loadUsers,
+            tooltip: 'Refresh List',
+          ),
+        ],
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: AppColors.textPrimary),
           onPressed: () => Navigator.pop(context),
@@ -120,31 +144,37 @@ class _AdminUserManagementScreenState extends ConsumerState<AdminUserManagementS
       body: Column(
         children: [
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             color: Colors.white,
-            child: TextField(
-              controller: _searchController,
-              onChanged: _onSearchChanged,
-              decoration: InputDecoration(
-                hintText: 'Search by name or Bestie ID...',
-                prefixIcon: const Icon(Icons.search, color: Colors.grey),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear, color: Colors.grey),
-                        onPressed: () {
-                          _searchController.clear();
-                          _onSearchChanged('');
-                        },
-                      )
-                    : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+            child: Column(
+              children: [
+                _buildStatsSummary(),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _searchController,
+                  onChanged: _onSearchChanged,
+                  decoration: InputDecoration(
+                    hintText: 'Search by name or Bestie ID...',
+                    prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, color: Colors.grey),
+                            onPressed: () {
+                              _searchController.clear();
+                              _onSearchChanged('');
+                            },
+                          )
+                        : null,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey.shade100,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  ),
                 ),
-                filled: true,
-                fillColor: Colors.grey.shade100,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              ),
+              ],
             ),
           ),
           Expanded(
@@ -164,16 +194,70 @@ class _AdminUserManagementScreenState extends ConsumerState<AdminUserManagementS
                           ],
                         ),
                       )
-                    : ListView.builder(
-                        itemCount: _users.length,
-                        padding: const EdgeInsets.all(16),
-                        itemBuilder: (context, index) {
-                          final user = _users[index];
-                          return _buildUserTile(user);
-                        },
+                    : RefreshIndicator(
+                        onRefresh: _loadUsers,
+                        color: AppColors.primary,
+                        child: ListView.builder(
+                          itemCount: _users.length,
+                          padding: const EdgeInsets.all(16),
+                          physics: const AlwaysScrollableScrollPhysics(), // Important for RefreshIndicator
+                          itemBuilder: (context, index) {
+                            final user = _users[index];
+                            return _buildUserTile(user);
+                          },
+                        ),
                       ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildStatsSummary() {
+    if (_isStatsLoading) {
+      return const SizedBox(height: 40, child: Center(child: LinearProgressIndicator()));
+    }
+
+    return Row(
+      children: [
+        _buildStatItem('Males', _genderDistribution['male'] ?? 0, Colors.blue),
+        const SizedBox(width: 8),
+        _buildStatItem('Females', _genderDistribution['female'] ?? 0, Colors.pink),
+        const SizedBox(width: 8),
+        _buildStatItem('Other', _genderDistribution['other'] ?? 0, Colors.purple),
+      ],
+    );
+  }
+
+  Widget _buildStatItem(String label, int count, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
+        ),
+        child: Column(
+          children: [
+            Text(
+              count.toString(),
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+            Text(
+              label,
+              style: TextStyle(
+                color: color.withValues(alpha: 0.8),
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -184,19 +268,24 @@ class _AdminUserManagementScreenState extends ConsumerState<AdminUserManagementS
 
     await showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: Text('Manage Role for ${user.name}'),
         content: StatefulBuilder(
-          builder: (context, setState) {
+          builder: (sheetContext, setState) {
             return Column(
               mainAxisSize: MainAxisSize.min,
               children: roles.map((role) {
-                return RadioListTile<String>(
+                return ListTile(
                   title: Text(role.toUpperCase()),
-                  value: role,
-                  groupValue: selectedRole,
-                  onChanged: (value) {
-                    setState(() => selectedRole = value);
+                  leading: Radio<String>(
+                    value: role,
+                    groupValue: selectedRole,
+                    onChanged: (value) {
+                      setState(() => selectedRole = value);
+                    },
+                  ),
+                  onTap: () {
+                    setState(() => selectedRole = role);
                   },
                 );
               }).toList(),
@@ -205,14 +294,14 @@ class _AdminUserManagementScreenState extends ConsumerState<AdminUserManagementS
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () async {
               if (selectedRole != null && selectedRole != user.role) {
                 try {
-                  Navigator.pop(context);
+                  Navigator.pop(dialogContext);
                   await ref.read(adminRepositoryProvider).updateUserRole(user.id, selectedRole!);
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -228,7 +317,7 @@ class _AdminUserManagementScreenState extends ConsumerState<AdminUserManagementS
                    }
                 }
               } else {
-                Navigator.pop(context);
+                Navigator.pop(dialogContext);
               }
             },
             child: const Text('Save'),
@@ -315,8 +404,12 @@ class _AdminUserManagementScreenState extends ConsumerState<AdminUserManagementS
             ),
             const SizedBox(height: 2),
             Text(
-              'Age: ${user.age} • ${user.gender}',
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+              'Age: ${user.age} • ${user.gender.toUpperCase()}',
+              style: TextStyle(
+                color: user.gender == 'female' ? Colors.pink : (user.gender == 'male' ? Colors.blue : Colors.grey.shade600),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),

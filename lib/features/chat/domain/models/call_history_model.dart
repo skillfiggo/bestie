@@ -19,6 +19,7 @@ class CallHistoryModel {
   final DateTime timestamp;
   final int durationSeconds; // 0 for missed calls
   final bool isOnline;
+  final bool showOnlineStatus;
 
   const CallHistoryModel({
     required this.id,
@@ -30,6 +31,7 @@ class CallHistoryModel {
     required this.timestamp,
     this.durationSeconds = 0,
     this.isOnline = false,
+    this.showOnlineStatus = true,
   });
 
   String get formattedDuration {
@@ -82,6 +84,7 @@ class CallHistoryModel {
       timestamp: DateTime.parse(map['created_at'] as String),
       durationSeconds: map['duration_seconds'] as int? ?? 0,
       isOnline: otherProfile?['is_online'] ?? false,
+      showOnlineStatus: otherProfile?['show_online_status'] ?? true,
     );
   }
 }
