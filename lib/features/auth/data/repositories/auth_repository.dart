@@ -108,11 +108,16 @@ class AuthRepository {
       final webClientId = dotenv.env['GOOGLE_WEB_CLIENT_ID'];
       final iosClientId = dotenv.env['GOOGLE_IOS_CLIENT_ID'];
 
+      debugPrint('Initializing Google Sign-In...');
+      debugPrint('Web Client ID: ${webClientId != null ? "found" : "missing"}');
+      debugPrint('iOS Client ID: ${iosClientId != null ? "found" : "missing"}');
+
       final GoogleSignIn googleSignIn = GoogleSignIn(
-        clientId: iosClientId,
+        clientId: (kIsWeb || defaultTargetPlatform == TargetPlatform.iOS) ? iosClientId : null,
         serverClientId: webClientId,
       );
 
+      debugPrint('Attempting googleSignIn.signIn()...');
       final googleUser = await googleSignIn.signIn();
       if (googleUser == null) {
         throw Exception('Google sign in cancelled');
@@ -122,26 +127,43 @@ class AuthRepository {
       final accessToken = googleAuth.accessToken;
       final idToken = googleAuth.idToken;
 
+      debugPrint('Google Auth successful. ID Token: ${idToken != null ? "found" : "missing"}, Access Token: ${accessToken != null ? "found" : "missing"}');
+
       if (idToken == null) {
-        throw Exception('No ID Token found.');
+        throw Exception('No ID Token found from Google. Please ensure Web Client ID is correct.');
       }
 
+      debugPrint('Signing in to Supabase with ID Token...');
       final response = await _client.auth.signInWithIdToken(
         provider: OAuthProvider.google,
         idToken: idToken,
         accessToken: accessToken,
       );
 
+      debugPrint('Supabase Sign-In successful for user: ${response.user?.id}');
+
       // 2. Check if profile exists, if not create it
       if (response.user != null) {
         final profile = await getProfile(response.user!.id);
-        if (profile == null) {
-          // New user, create profile with Google data
+        
+        // If profile exists but name/status is missing, we still want to update it
+        if (profile == null || 
+            profile['name'] == 'New User' || 
+            profile['status'] == 'pending_profile' ||
+            profile['gender'] == null ||
+            profile['gender'] == '' ||
+            profile['gender'] == 'other') {
+          
+          debugPrint('Profile needs initialization or update with Google data...');
+          // New user or incomplete profile, create/update with Google data
           await createProfile(response.user!.id, {
-            'name': googleUser.displayName ?? '',
-            'avatar_url': googleUser.photoUrl ?? '',
+            'name': googleUser.displayName ?? profile?['name'] ?? '',
+            'avatar_url': googleUser.photoUrl ?? profile?['avatar_url'] ?? '',
             'email': googleUser.email,
           });
+          debugPrint('Profile created/updated successfully');
+        } else {
+          debugPrint('Existing complete profile found for user ${response.user!.id}');
         }
       }
 

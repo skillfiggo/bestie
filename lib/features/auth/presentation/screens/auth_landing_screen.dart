@@ -3,6 +3,7 @@ import 'package:bestie/core/constants/app_colors.dart';
 import 'package:bestie/app/router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bestie/features/auth/data/providers/auth_providers.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AuthLandingScreen extends ConsumerWidget {
   const AuthLandingScreen({super.key});
@@ -13,11 +14,34 @@ class AuthLandingScreen extends ConsumerWidget {
     // including after sendOtp() which we DON'T want to navigate on.
     // Navigation is now handled locally in screens or by session stream.
 
+    ref.listen<AsyncValue<void>>(
+      authControllerProvider,
+      (previous, next) {
+        if (next is AsyncError) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(next.error.toString().replaceAll('Exception:', '').trim()),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        } else if (next is AsyncData) {
+           // We can check if navigation is needed here, 
+           // but since landing is simple, we check if user is now logged in.
+           final user = Supabase.instance.client.auth.currentUser;
+           if (user != null) {
+              // Sign in successful
+              // We'll let the session stream or the local check below handle navigation
+              // but adding a small delay or ensuring we navigate only once is good.
+           }
+        }
+      },
+    );
+
     final authState = ref.watch(authControllerProvider);
     final isLoading = authState is AsyncLoading;
 
     return Scaffold(
-      backgroundColor: AppColors.primary, // Using primary green as background base
+      backgroundColor: AppColors.primary, 
       body: Stack(
         children: [
           // Background Decor (Abstract shapes)
@@ -58,7 +82,7 @@ class AuthLandingScreen extends ConsumerWidget {
                         padding: const EdgeInsets.all(20),
                         child: Image.asset(
                           'assets/images/logo.png',
-                          width: 160, // Reduced from 280
+                          width: 160, 
                           fit: BoxFit.contain,
                         ),
                       ),
@@ -83,19 +107,43 @@ class AuthLandingScreen extends ConsumerWidget {
                                   await ref.read(authControllerProvider.notifier).signInWithGoogle();
                                   if (context.mounted) {
                                     final authState = ref.read(authControllerProvider);
-                                    authState.whenOrNull(
-                                      data: (_) {
-                                        // Google sign-in successful, navigate to main shell
-                                        Navigator.pushNamedAndRemoveUntil(context, AppRouter.mainShell, (route) => false);
-                                      },
-                                    );
+                                    if (authState is AsyncData) {
+                                      final authRepo = ref.read(authRepositoryProvider);
+                                      final user = authRepo.getCurrentUser();
+                                      if (user != null) {
+                                        final profile = await authRepo.getProfile(user.id);
+                                        if (context.mounted) {
+                                          if (profile == null || 
+                                              profile['status'] == 'pending_profile' || 
+                                              profile['gender'] == null || 
+                                              profile['gender'] == '') {
+                                            // New user or incomplete profile, go to onboarding/signup forms
+                                            Navigator.pushNamedAndRemoveUntil(
+                                              context, 
+                                              AppRouter.authForms, 
+                                              (route) => false,
+                                              arguments: 1, // Go to signup tab
+                                            );
+                                          } else {
+                                            // Existing user with complete profile
+                                            Navigator.pushNamedAndRemoveUntil(
+                                              context, 
+                                              AppRouter.mainShell, 
+                                              (route) => false
+                                            );
+                                          }
+                                        }
+                                      }
+                                    }
                                   }
                                 },
                               ),
                               if (isLoading)
                                 const Positioned.fill(
                                   child: Center(
-                                    child: CircularProgressIndicator(),
+                                    child: CircularProgressIndicator(
+                                      color: AppColors.primary,
+                                    ),
                                   ),
                                 ),
                               Positioned(
