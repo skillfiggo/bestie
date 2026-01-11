@@ -39,6 +39,34 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   final _dobController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    // Skip to appropriate step if user is already authenticated (e.g. Google)
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final authRepo = ref.read(authRepositoryProvider);
+      final user = authRepo.getCurrentUser();
+      
+      if (user != null && _pageController.hasClients) {
+        debugPrint('User already logged in: ${user.id}. Checking profile status...');
+        final profile = await authRepo.getProfile(user.id);
+        
+        if (!mounted) return;
+        
+        if (profile == null || profile['gender'] == null || profile['gender'] == '' || profile['gender'] == 'other') {
+          debugPrint('Skipping to Gender selection step...');
+          _pageController.jumpToPage(3);
+        } else {
+          debugPrint('Gender already set: ${profile['gender']}. Skipping to Profile Details...');
+          setState(() {
+            _gender = profile['gender'];
+          });
+          _pageController.jumpToPage(4);
+        }
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _pageController.dispose();
     _nameController.dispose();

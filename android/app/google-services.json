@@ -1,1 +1,47 @@
-{"installed":{"client_id":"845882768068-n08r8pamab43luhr554vkmtop4fih6u0.apps.googleusercontent.com","project_id":"bestieechat","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","auth_provider_x509_cert_url":"https://www.googleapis.com/oauth2/v1/certs"}}
+{
+  "project_info": {
+    "project_number": "845882768068",
+    "project_id": "bestieechat",
+    "storage_bucket": "bestieechat.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:845882768068:android:829a412ca3ee2bfc0ae791",
+        "android_client_info": {
+          "package_name": "com.skillfiggo.bestie"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "845882768068-n08r8pamab43luhr554vkmtop4fih6u0.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.skillfiggo.bestie",
+            "certificate_hash": "6864b3cc506901a9436610a7b846d4389455d0d7"
+          }
+        },
+        {
+          "client_id": "845882768068-3ok8lo365geupr5kp5oipei8a7f5o6ds.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD4JCb0QFb25c2moGv0ndJ_I7BfT-y4SiE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "845882768068-3ok8lo365geupr5kp5oipei8a7f5o6ds.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
