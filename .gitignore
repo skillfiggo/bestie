@@ -47,3 +47,9 @@ app.*.map.json
 # Environment variables (contains sensitive credentials)
 .env
 
+# Google / Firebase credential files — contain API keys and OAuth client IDs
+# These must NEVER be committed. Distribute to team members out-of-band.
+android/app/google-services.json
+android/app/google-services-CORRECT-EXAMPLE.json
+ios/Runner/GoogleService-Info.plist
+lib/firebase_options.dart
