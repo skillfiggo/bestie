@@ -33,7 +33,10 @@ class _MainShellViewState extends State<MainShellView> {
     return ChatNotificationListener(
       child: CallListener(
       child: Scaffold(
-        body: _screens[_currentIndex],
+        body: IndexedStack(
+          index: _currentIndex,
+          children: _screens,
+        ),
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: _currentIndex,
           backgroundColor: Colors.white,

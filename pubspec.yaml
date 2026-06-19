@@ -64,6 +64,16 @@ dependencies:
   connectivity_plus: ^6.1.2
   google_fonts: ^6.3.3
   screen_protector: ^1.4.13
+  shared_preferences: ^2.5.4
+  firebase_core: ^4.11.0
+  firebase_messaging: ^16.4.0
+  cached_network_image: ^3.4.1
+  flutter_cache_manager: ^3.4.1
+  video_player: ^2.11.1
+  device_info_plus: ^12.4.0
+  flutter_jailbreak_detection: ^1.10.0
+  package_info_plus: ^9.0.1
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:
@@ -95,6 +105,7 @@ flutter:
     - .env
     - assets/images/
     - assets/images/icons/
+    - assets/images/avatars/
     - assets/sounds/
 
 

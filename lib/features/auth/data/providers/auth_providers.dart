@@ -7,6 +7,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 part 'auth_providers.g.dart';
 
@@ -21,20 +22,53 @@ StorageRepository storageRepository(Ref ref) {
 }
 
 @riverpod
-Stream<ProfileModel?> userProfile(Ref ref) {
+Stream<ProfileModel?> userProfile(Ref ref) async* {
   final authRepo = ref.watch(authRepositoryProvider);
   final user = authRepo.getCurrentUser();
   
   if (user == null) {
-    return Stream.value(null);
+    yield null;
+    return;
+  }
+
+  // 1. Immediately yield cached profile if it exists in SharedPreferences
+  ProfileModel? cachedProfile;
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final cachedStr = prefs.getString('cached_user_profile_${user.id}');
+    if (cachedStr != null) {
+      cachedProfile = ProfileModel.fromJson(cachedStr);
+      yield cachedProfile;
+    }
+  } catch (e) {
+    debugPrint('Error loading cached profile from SharedPreferences: $e');
   }
 
   // Update last active
-  authRepo.updateLastActive(user.id);
+  try {
+    authRepo.updateLastActive(user.id);
+  } catch (_) {}
 
-  return authRepo.watchProfile(user.id).map((data) {
+  // 2. Stream live updates from database
+  final liveStream = authRepo.watchProfile(user.id).map((data) {
     if (data.isEmpty) return null;
-    return ProfileModel.fromMap(data);
+    final profile = ProfileModel.fromMap(data);
+    cachedProfile = profile;
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setString('cached_user_profile_${user.id}', profile.toJson());
+    }).catchError((err) {
+      debugPrint('Error updating cached profile: $err');
+    });
+    return profile;
+  });
+
+  // 3. Handle stream errors gracefully by serving the cached version instead of crashing/failing
+  yield* liveStream.handleError((error) {
+    debugPrint('userProfile live stream error: $error. Serving cached profile.');
+    if (cachedProfile != null) {
+      return cachedProfile!;
+    }
+    throw error;
   });
 }
 

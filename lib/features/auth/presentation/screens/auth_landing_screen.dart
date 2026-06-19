@@ -18,12 +18,34 @@ class AuthLandingScreen extends ConsumerWidget {
       authControllerProvider,
       (previous, next) {
         if (next is AsyncError) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(next.error.toString().replaceAll('Exception:', '').trim()),
-              backgroundColor: AppColors.error,
-            ),
-          );
+          final msg = next.error.toString()
+              .replaceAll('Exception:', '')
+              .trim();
+          // Silently ignore cancellations — user tapped back deliberately
+          if (msg.toLowerCase().contains('cancelled')) return;
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(
+              SnackBar(
+                content: Row(
+                  children: [
+                    const Icon(Icons.wifi_off_rounded, color: Colors.white, size: 18),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        msg,
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  ],
+                ),
+                backgroundColor: const Color(0xFFD32F2F),
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                duration: const Duration(seconds: 4),
+              ),
+            );
         } else if (next is AsyncData) {
            // We can check if navigation is needed here, 
            // but since landing is simple, we check if user is now logged in.
@@ -237,16 +259,20 @@ class AuthLandingScreen extends ConsumerWidget {
           Positioned(
             top: 50,
             right: 24,
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.headphones_rounded,
-                color: Colors.white,
-                size: 24,
+            child: GestureDetector(
+              onTap: () => Navigator.pushNamed(context, AppRouter.support),
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 1),
+                ),
+                child: const Icon(
+                  Icons.headphones_rounded,
+                  color: Colors.white,
+                  size: 24,
+                ),
               ),
             ),
           ),

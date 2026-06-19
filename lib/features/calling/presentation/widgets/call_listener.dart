@@ -6,6 +6,8 @@ import 'package:bestie/features/calling/presentation/screens/call_screen.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:bestie/features/chat/data/repositories/call_repository.dart';
 import 'package:bestie/core/services/audio_service.dart';
+import 'package:bestie/features/profile/presentation/screens/notification_settings_screen.dart';
+import 'package:bestie/features/auth/data/providers/auth_providers.dart';
 
 class CallListener extends ConsumerStatefulWidget {
   final Widget child;
@@ -63,6 +65,21 @@ class _CallListenerState extends ConsumerState<CallListener> {
       // Check if we've already handled this message
       if (_handledMessageIds.contains(messageId)) {
         debugPrint('Call message already handled: $messageId');
+        return;
+      }
+
+      // ── Do Not Disturb / Block Calls: auto-reject silently ──────────────
+      final isDnd = ref.read(doNotDisturbProvider);
+      final userProfile = ref.read(userProfileProvider).valueOrNull;
+      final receiveCalls = userProfile?.receiveCalls ?? true;
+      if (isDnd || !receiveCalls) {
+        _handledMessageIds.add(messageId);
+        // Extract call_history_id and reject immediately
+        final callIdMatch = RegExp(r'\[call_id:([^\]]+)\]').firstMatch(content);
+        if (callIdMatch != null) {
+          ref.read(callRepositoryProvider).rejectCall(callIdMatch.group(1)!);
+        }
+        debugPrint('📵 Auto-reject active (DND: $isDnd, receiveCalls: $receiveCalls) — call auto-rejected');
         return;
       }
       

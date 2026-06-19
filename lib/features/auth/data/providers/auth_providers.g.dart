@@ -6,7 +6,7 @@ part of 'auth_providers.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$authRepositoryHash() => r'e3b22fd7863ea1be0b322870da43112c60f80087';
+String _$authRepositoryHash() => r'19a3485653561ac2f781b997131430c5659286d1';
 
 /// See also [authRepository].
 @ProviderFor(authRepository)
@@ -23,7 +23,7 @@ final authRepositoryProvider = AutoDisposeProvider<AuthRepository>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef AuthRepositoryRef = AutoDisposeProviderRef<AuthRepository>;
-String _$storageRepositoryHash() => r'a7d6d59749c96acff20ec4fb02f71ad636415093';
+String _$storageRepositoryHash() => r'797681fd6970a5d7aab8df0e4188a2afff154800';
 
 /// See also [storageRepository].
 @ProviderFor(storageRepository)
@@ -41,7 +41,7 @@ final storageRepositoryProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef StorageRepositoryRef = AutoDisposeProviderRef<StorageRepository>;
-String _$userProfileHash() => r'd903b8743f26a6677a18f157a44af377e3743ad7';
+String _$userProfileHash() => r'75f16b5b1d57667ccdb53b1ed851f727c77e7bfe';
 
 /// See also [userProfile].
 @ProviderFor(userProfile)
@@ -58,7 +58,7 @@ final userProfileProvider = AutoDisposeStreamProvider<ProfileModel?>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef UserProfileRef = AutoDisposeStreamProviderRef<ProfileModel?>;
-String _$userProfileByIdHash() => r'79d2e1f95b8584c151945cc96dfd8eb5c77c2915';
+String _$userProfileByIdHash() => r'59ced7f89a06710921aaa39de7f6d51b7444df6a';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -199,7 +199,7 @@ class _UserProfileByIdProviderElement
   String get userId => (origin as UserProfileByIdProvider).userId;
 }
 
-String _$authControllerHash() => r'5b162f620f09b5cea475c29bee96d367df50fff6';
+String _$authControllerHash() => r'1bab5174dee2e9598b03b24096c3990f47548e0e';
 
 /// See also [AuthController].
 @ProviderFor(AuthController)

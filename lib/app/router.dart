@@ -8,6 +8,7 @@ import 'package:bestie/features/home/presentation/home_view.dart';
 import 'package:bestie/features/moment/presentation/moment_view.dart';
 import 'package:bestie/features/chat/presentation/chat_view.dart';
 import 'package:bestie/features/profile/presentation/profile_view.dart';
+import 'package:bestie/features/profile/presentation/screens/help_center_screen.dart';
 
 class AppRouter {
   static const String splash = '/';
@@ -19,6 +20,7 @@ class AppRouter {
   static const String moment = '/moment';
   static const String chat = '/chat';
   static const String profile = '/profile';
+  static const String support = '/support';
 
   static Map<String, WidgetBuilder> get routes => {
         splash: (_) => const SplashView(),
@@ -30,5 +32,6 @@ class AppRouter {
         moment: (_) => const MomentView(),
         chat: (_) => const ChatView(),
         profile: (_) => const ProfileView(),
+        support: (_) => const HelpCenterScreen(),
       };
 }

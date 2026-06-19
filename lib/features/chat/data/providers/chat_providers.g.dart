@@ -6,7 +6,7 @@ part of 'chat_providers.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$chatRepositoryHash() => r'7956fc1edca9bb8f22bf4cb09bc189b02b36af89';
+String _$chatRepositoryHash() => r'ea9e083da4dcdf131e1c2e9541b05be8efba8977';
 
 /// See also [chatRepository].
 @ProviderFor(chatRepository)
@@ -23,7 +23,7 @@ final chatRepositoryProvider = AutoDisposeProvider<ChatRepository>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef ChatRepositoryRef = AutoDisposeProviderRef<ChatRepository>;
-String _$chatListHash() => r'2291c13b4dc459292dcfbacedc3a0e027e2dc601';
+String _$chatListHash() => r'7297fecea5585434c6627655d86a6b922c25e49a';
 
 /// See also [chatList].
 @ProviderFor(chatList)
@@ -40,7 +40,7 @@ final chatListProvider = AutoDisposeStreamProvider<List<ChatModel>>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef ChatListRef = AutoDisposeStreamProviderRef<List<ChatModel>>;
-String _$chatMessagesHash() => r'289ac1724e02ccbacdd0efeaec7e0b87cb1aa947';
+String _$chatMessagesHash() => r'31586e8a716f2a0ad60cafc6c0863e0653d32ec2';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -181,7 +181,7 @@ class _ChatMessagesProviderElement
   String get chatId => (origin as ChatMessagesProvider).chatId;
 }
 
-String _$callHistoryListHash() => r'cc82d9a54245fd1bd47697ec2adf703ef036c5a3';
+String _$callHistoryListHash() => r'25471084d3a956483e98491958fee410d250b79b';
 
 /// See also [callHistoryList].
 @ProviderFor(callHistoryList)

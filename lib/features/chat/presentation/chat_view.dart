@@ -6,6 +6,7 @@ import 'package:bestie/features/chat/domain/models/call_history_model.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bestie/features/chat/data/providers/chat_providers.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class ChatView extends ConsumerWidget {
   const ChatView({super.key});
@@ -116,7 +117,7 @@ class ChatView extends ConsumerWidget {
                         radius: 28,
                         backgroundColor: Colors.grey.shade200,
                         backgroundImage: call.contactImageUrl.isNotEmpty 
-                            ? NetworkImage(call.contactImageUrl) 
+                            ? CachedNetworkImageProvider(call.contactImageUrl) 
                             : null,
                         child: call.contactImageUrl.isEmpty 
                             ? Text(call.contactName[0].toUpperCase()) 
@@ -244,7 +245,7 @@ class _ChatList extends ConsumerWidget {
                     backgroundColor: chat.isOfficial ? Colors.transparent : null,
                     backgroundImage: chat.isOfficial 
                         ? const AssetImage('assets/images/official_team.png') as ImageProvider
-                        : (chat.imageUrl.isNotEmpty ? NetworkImage(chat.imageUrl) : null),
+                        : (chat.imageUrl.isNotEmpty ? CachedNetworkImageProvider(chat.imageUrl) : null),
                     child: (chat.imageUrl.isEmpty && !chat.isOfficial) ? Text(chat.name[0]) : null,
                   ),
                   if (chat.isOnline && chat.showOnlineStatus)

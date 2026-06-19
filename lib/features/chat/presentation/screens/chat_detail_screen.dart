@@ -14,6 +14,7 @@ import 'package:bestie/features/chat/data/repositories/call_repository.dart';
 import 'package:bestie/features/profile/presentation/screens/user_profile_screen.dart';
 import 'package:bestie/features/admin/presentation/widgets/report_dialog.dart';
 import 'package:bestie/features/auth/data/providers/auth_providers.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class ChatDetailScreen extends ConsumerStatefulWidget {
   final ChatModel chat;
@@ -499,7 +500,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                       : Colors.grey.shade200,
                   backgroundImage: widget.chat.isOfficial 
                       ? const AssetImage('assets/images/official_team.png') as ImageProvider
-                      : (widget.chat.imageUrl.isNotEmpty ? NetworkImage(widget.chat.imageUrl) : null),
+                      : (widget.chat.imageUrl.isNotEmpty ? CachedNetworkImageProvider(widget.chat.imageUrl) : null),
                   child: (widget.chat.imageUrl.isEmpty && !widget.chat.isOfficial) ? Text(widget.chat.name[0]) : null,
                 ),
                 if (widget.chat.isOnline && widget.chat.showOnlineStatus && !widget.chat.isOfficial)

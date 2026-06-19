@@ -3,8 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bestie/core/constants/app_colors.dart';
 import 'package:bestie/features/home/domain/models/profile_model.dart';
 import 'package:bestie/features/home/presentation/widgets/profile_card.dart';
-import 'package:bestie/features/home/presentation/widgets/ad_banner.dart';
-import 'package:bestie/features/visitor/presentation/visitor_view.dart';
 import 'package:bestie/features/home/presentation/widgets/nearby_view.dart';
 import 'package:bestie/features/profile/data/repositories/profile_repository.dart';
 import 'package:bestie/features/chat/presentation/screens/chat_detail_screen.dart';
@@ -15,8 +13,15 @@ import 'package:bestie/features/auth/data/providers/auth_providers.dart';
 import 'package:bestie/features/chat/data/repositories/call_repository.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:bestie/features/admin/data/repositories/admin_repository.dart';
-import 'package:bestie/features/home/presentation/widgets/search_user_delegate.dart';
 import 'package:bestie/core/services/connectivity_service.dart';
+import 'package:bestie/features/after_dark/presentation/screens/after_dark_hub_screen.dart';
+import 'package:bestie/features/ai_chat/presentation/hot_talk_view.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'dart:convert';
+import 'dart:math' as math;
+import 'package:shared_preferences/shared_preferences.dart';
+
+
 
 class HomeView extends ConsumerStatefulWidget {
   const HomeView({super.key});
@@ -41,8 +46,35 @@ class _HomeViewState extends ConsumerState<HomeView> {
   @override
   void initState() {
     super.initState();
+    _loadCachedData();
     _loadAllData();
     _checkBroadcast();
+  }
+
+  Future<void> _loadCachedData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final recommendStr = prefs.getString('cached_recommend_profiles');
+      final newcomerStr = prefs.getString('cached_newcomer_profiles');
+      
+      if (recommendStr != null || newcomerStr != null) {
+        if (mounted) {
+          setState(() {
+            if (recommendStr != null) {
+              final List<dynamic> list = json.decode(recommendStr);
+              _recommendProfiles = list.map((item) => ProfileModel.fromMap(Map<String, dynamic>.from(item))).toList();
+            }
+            if (newcomerStr != null) {
+              final List<dynamic> list = json.decode(newcomerStr);
+              _newcomerProfiles = list.map((item) => ProfileModel.fromMap(Map<String, dynamic>.from(item))).toList();
+            }
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading cached discovery profiles: $e');
+    }
   }
   
   Future<void> _checkBroadcast() async {
@@ -122,22 +154,33 @@ class _HomeViewState extends ConsumerState<HomeView> {
 
   Future<void> _loadAllData() async {
     setState(() {
-      _isLoading = true;
+      if (_recommendProfiles.isEmpty && _newcomerProfiles.isEmpty) {
+        _isLoading = true;
+      }
       _error = null;
     });
 
     try {
       // 1. Get current user's gender to filter by opposite
-      final userProfile = ref.read(userProfileProvider).valueOrNull;
+      ProfileModel? userProfile = ref.read(userProfileProvider).valueOrNull;
+      if (userProfile == null) {
+        try {
+          userProfile = await ref.read(userProfileProvider.future).timeout(const Duration(seconds: 3));
+        } catch (e) {
+          debugPrint('Error/timeout fetching user profile: $e');
+        }
+      }
+
       String? targetGender;
-      
       if (userProfile != null) {
-        if (userProfile.gender == 'male') {
+        final genderLower = userProfile.gender.toLowerCase().trim();
+        if (genderLower == 'male') {
           targetGender = 'female';
-        } else if (userProfile.gender == 'female') {
+        } else if (genderLower == 'female') {
           targetGender = 'male';
         }
       }
+      debugPrint('HomeView discovery: userProfile = ${userProfile?.name}, gender = ${userProfile?.gender}, targetGender = $targetGender');
 
       // Fetch both Recommended and Newcomers in parallel
       final results = await Future.wait([
@@ -152,18 +195,73 @@ class _HomeViewState extends ConsumerState<HomeView> {
         ),
       ]);
       
+      // Compute distance client-side using Haversine formula
+      double? _haversineKm(double? lat1, double? lon1, double? lat2, double? lon2) {
+        if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) return null;
+        const r = 6371.0; // Earth radius in km
+        final dLat = (lat2 - lat1) * math.pi / 180;
+        final dLon = (lon2 - lon1) * math.pi / 180;
+        final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+            math.cos(lat1 * math.pi / 180) *
+                math.cos(lat2 * math.pi / 180) *
+                math.sin(dLon / 2) *
+                math.sin(dLon / 2);
+        return r * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+      }
+
+      List<ProfileModel> _withDistance(List<ProfileModel> profiles) {
+        if (userProfile?.latitude == null || userProfile?.longitude == null) return profiles;
+        return profiles.map((p) {
+          final km = _haversineKm(
+            userProfile!.latitude, userProfile.longitude,
+            p.latitude, p.longitude,
+          );
+          return km != null ? p.copyWith(distanceKm: km) : p;
+        }).toList();
+      }
+
+      // Sort: online first → recently active (away) → offline
+      int _onlineRank(ProfileModel p) {
+        if (p.isOnline) return 0;
+        if (p.lastActiveAt != null &&
+            DateTime.now().difference(p.lastActiveAt!).inMinutes < 5) return 1;
+        return 2;
+      }
+
+      final recProfiles = _withDistance(results[0])..sort((a, b) => _onlineRank(a).compareTo(_onlineRank(b)));
+      final newProfiles = _withDistance(results[1])..sort((a, b) => _onlineRank(a).compareTo(_onlineRank(b)));
+
+
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        prefs.setString('cached_recommend_profiles', json.encode(recProfiles.map((p) => p.toMap()).toList()));
+        prefs.setString('cached_newcomer_profiles', json.encode(newProfiles.map((p) => p.toMap()).toList()));
+      } catch (cacheErr) {
+        debugPrint('Failed to save discovery profiles to cache: $cacheErr');
+      }
+
       if (mounted) {
         setState(() {
-          _recommendProfiles = results[0];
-          _newcomerProfiles = results[1];
+          _recommendProfiles = recProfiles;
+          _newcomerProfiles = newProfiles;
           _isLoading = false;
         });
       }
     } catch (e) {
+      debugPrint('Failed to fetch discovery data: $e');
       if (mounted) {
         setState(() {
-          _error = ConnectivityService.getNetworkErrorMessage(e);
           _isLoading = false;
+          if (_recommendProfiles.isEmpty && _newcomerProfiles.isEmpty) {
+            _error = ConnectivityService.getNetworkErrorMessage(e);
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('🌐 No internet connection. Showing cached profiles.'),
+                duration: Duration(seconds: 3),
+              ),
+            );
+          }
         });
       }
     }
@@ -348,6 +446,15 @@ class _HomeViewState extends ConsumerState<HomeView> {
 
   @override
   Widget build(BuildContext context) {
+    // Reload discovery if gender changes
+    ref.listen<AsyncValue<ProfileModel?>>(userProfileProvider, (previous, next) {
+      final prevGender = previous?.valueOrNull?.gender;
+      final nextGender = next.valueOrNull?.gender;
+      if (nextGender != null && prevGender != nextGender && !_isLoading) {
+        _loadAllData();
+      }
+    });
+
     return DefaultTabController(
       length: 3,
       child: Scaffold(
@@ -355,53 +462,109 @@ class _HomeViewState extends ConsumerState<HomeView> {
         appBar: AppBar(
           backgroundColor: Colors.white,
           elevation: 0,
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.search, color: AppColors.textPrimary),
-              tooltip: 'Search User',
-              onPressed: () {
-                showSearch(
-                  context: context,
-                  delegate: SearchUserDelegate(ref),
-                );
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.favorite_rounded, color: AppColors.primary),
-              tooltip: 'Visitors',
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const VisitorView()),
-                );
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.tune_rounded, color: AppColors.textPrimary),
-              onPressed: _showFilterModal,
-            ),
-          ],
+          toolbarHeight: 0,
           bottom: PreferredSize(
-            preferredSize: const Size.fromHeight(130),
+            preferredSize: const Size.fromHeight(153),
             child: Column(
               children: [
-                const AdBanner(),
-                const TabBar(
-                  labelColor: AppColors.primary,
-                  unselectedLabelColor: Colors.grey,
-                  indicatorColor: AppColors.primary,
-                  labelStyle: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                Padding(
+                  padding: const EdgeInsets.only(left: 16, right: 16, top: 10, bottom: 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _FeatureCard(
+                          label: 'Hot Talk',
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFFF9A56), Color(0xFFFF6B6B)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          icon: Icons.local_fire_department_rounded,
+                          badgeIcon: Icons.mic_rounded,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const HotTalkView()),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _FeatureCard(
+                          label: 'After Dark',
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFB8F000), Color(0xFF7EC800)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          icon: Icons.nights_stay_rounded,
+                          badgeIcon: Icons.auto_awesome_rounded,
+                          badgeColor: const Color(0xFFFFE066),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const AfterDarkHubScreen()),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _FeatureCard(
+                          label: 'Voice Chats',
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFAB47BC), Color(0xFF7E57C2)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          icon: Icons.graphic_eq,
+                          badgeIcon: Icons.graphic_eq,
+                          onTap: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Voice Chats feature coming soon!'),
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
                   ),
-                  unselectedLabelStyle: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.normal,
-                  ),
-                  tabs: [
-                    Tab(text: 'Recommend'),
-                    Tab(text: 'Newcomer'),
-                    Tab(text: 'Nearby'),
+                ),
+                Row(
+                  children: [
+                    const Expanded(
+                      child: TabBar(
+                        labelColor: AppColors.primary,
+                        unselectedLabelColor: Colors.grey,
+                        indicatorColor: AppColors.primary,
+                        labelStyle: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        unselectedLabelStyle: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.normal,
+                        ),
+                        tabs: [
+                          Tab(text: 'Recommend'),
+                          Tab(text: 'Newcomer'),
+                          Tab(text: 'Nearby'),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: SvgPicture.asset(
+                        'assets/images/icons/Maggi.svg',
+                        width: 24,
+                        height: 24,
+                        colorFilter: const ColorFilter.mode(AppColors.textPrimary, BlendMode.srcIn),
+                      ),
+                      onPressed: _showFilterModal,
+                    ),
+                    const SizedBox(width: 8),
                   ],
                 ),
               ],
@@ -458,13 +621,20 @@ class _HomeViewState extends ConsumerState<HomeView> {
           )
         : RefreshIndicator(
             onRefresh: _loadAllData,
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
+            child: GridView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10,
+                childAspectRatio: 0.58,
+              ),
               itemCount: profiles.length,
               itemBuilder: (context, index) {
                 final profile = profiles[index];
                 return ProfileCard(
                   profile: profile,
+                  isCompact: true,
                   onTap: () {
                     Navigator.push(
                       context,
@@ -502,3 +672,116 @@ class _HomeViewState extends ConsumerState<HomeView> {
           );
   }
 }
+
+/// Colorful feature card used in the top banner row (Hot Talk, After Dark, Voice Chats).
+class _FeatureCard extends StatelessWidget {
+  final String label;
+  final LinearGradient gradient;
+  final IconData icon;
+  final IconData? badgeIcon;
+  final Color? badgeColor;
+  final VoidCallback onTap;
+
+  const _FeatureCard({
+    required this.label,
+    required this.gradient,
+    required this.icon,
+    this.badgeIcon,
+    this.badgeColor,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 80,
+        decoration: BoxDecoration(
+          gradient: gradient,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: gradient.colors.first.withValues(alpha: 0.35),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Stack(
+          clipBehavior: Clip.hardEdge,
+          children: [
+            // Large faded background icon — bottom-right
+            Positioned(
+              right: -10,
+              bottom: -10,
+              child: Icon(
+                icon,
+                size: 70,
+                color: Colors.white.withValues(alpha: 0.18),
+              ),
+            ),
+            // Badge icon — top-right circle
+            if (badgeIcon != null)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.25),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    badgeIcon,
+                    size: 13,
+                    color: badgeColor ?? Colors.white,
+                  ),
+                ),
+              ),
+            // Content: title top-left, play button bottom-left
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Title — top-left, bold, can wrap to 2 lines
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      height: 1.2,
+                      letterSpacing: 0.2,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  // Play circle — bottom-left
+                  Container(
+                    width: 22,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.25),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.play_arrow_rounded,
+                      size: 14,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+

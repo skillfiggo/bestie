@@ -7,7 +7,7 @@ part of 'friendship_providers.dart';
 // **************************************************************************
 
 String _$friendshipRepositoryHash() =>
-    r'b85f772c716b62eda88999cfe18a2cc67689eb6d';
+    r'd5a06d6a448837ea99eb3435eef4f341a4e9d988';
 
 /// See also [friendshipRepository].
 @ProviderFor(friendshipRepository)
@@ -25,7 +25,7 @@ final friendshipRepositoryProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef FriendshipRepositoryRef = AutoDisposeProviderRef<FriendshipRepository>;
-String _$friendsCountHash() => r'cd37fa91513849844e49765d9c2b035bb05cb01d';
+String _$friendsCountHash() => r'a38a978f34bcf1b8c66d53c0dcc6edc4dff78140';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -165,7 +165,7 @@ class _FriendsCountProviderElement extends AutoDisposeFutureProviderElement<int>
   String get userId => (origin as FriendsCountProvider).userId;
 }
 
-String _$bestiesCountHash() => r'822a2faf08eb1df3a768f10f7f580f2c5221d3fc';
+String _$bestiesCountHash() => r'2e3c6f5a7c5eca0f04ae1626c183def53080a918';
 
 /// See also [bestiesCount].
 @ProviderFor(bestiesCount)
@@ -284,7 +284,7 @@ class _BestiesCountProviderElement extends AutoDisposeFutureProviderElement<int>
   String get userId => (origin as BestiesCountProvider).userId;
 }
 
-String _$friendsListHash() => r'899eb7252be32d59a389b2b9f91aacd2ba193b37';
+String _$friendsListHash() => r'd04fc355aedea3aa8f07182789dfe41113bc0795';
 
 /// See also [friendsList].
 @ProviderFor(friendsList)
@@ -406,7 +406,7 @@ class _FriendsListProviderElement
   String get userId => (origin as FriendsListProvider).userId;
 }
 
-String _$bestiesListHash() => r'dd23a0d8944932a96e933aa286bb7b928414efff';
+String _$bestiesListHash() => r'7899ceb555ba13e75220d297d03267aea9bd99f7';
 
 /// See also [bestiesList].
 @ProviderFor(bestiesList)

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bestie/core/constants/app_colors.dart';
 import 'package:bestie/features/admin/data/repositories/system_config_repository.dart';
+import 'package:bestie/core/widgets/app_cached_image.dart';
 
 class AdBanner extends ConsumerStatefulWidget {
   const AdBanner({super.key});
@@ -145,33 +146,18 @@ class _AdBannerState extends ConsumerState<AdBanner> {
                   setState(() => _currentImagePage = index);
                 },
                 itemBuilder: (context, index) {
-                  return Image.network(
-                    _bannerImages[index],
+                  return AppCachedImage(
+                    imageUrl: _bannerImages[index],
                     fit: BoxFit.cover,
-                    alignment: Alignment.center,
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      return Container(
-                        color: Colors.grey.shade800,
-                        child: const Center(
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
+                    placeholder: Container(
+                      color: Colors.grey.shade800,
+                      child: const Center(
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
                         ),
-                      );
-                    },
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [Color(0xFF2E3192), Color(0xFF1BFFFF)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                        ),
-                      );
-                    },
+                      ),
+                    ),
                   );
                 },
               ),

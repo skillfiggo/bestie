@@ -170,7 +170,24 @@ class AuthRepository {
       return response;
     } catch (e) {
       debugPrint('Google Sign-In Error: $e');
-      throw Exception('Google sign in failed: $e');
+      // Translate PlatformException codes into friendly messages
+      final raw = e.toString();
+      if (raw.contains('network_error') ||
+          raw.contains('Failed host lookup') ||
+          raw.contains('SocketException')) {
+        throw Exception('No internet connection. Please check your network and try again.');
+      } else if (raw.contains('sign_in_cancelled') ||
+                 raw.contains('Google sign in cancelled')) {
+        throw Exception('Sign in cancelled.');
+      } else if (raw.contains('sign_in_required')) {
+        throw Exception('Please sign in to continue.');
+      } else if (raw.contains('sign_in_failed') ||
+                 raw.contains('ApiException: 10')) {
+        throw Exception('Google sign in failed. Please check your internet and try again.');
+      } else if (raw.contains('No ID Token')) {
+        throw Exception('Google configuration error. Please contact support.');
+      }
+      throw Exception('Google sign in failed. Please try again.');
     }
   }
 
@@ -264,6 +281,15 @@ class AuthRepository {
     }
   }
 
+  /// Delete current user account from database (auth + profile cascade)
+  Future<void> deleteAccount() async {
+    try {
+      await _client.rpc('delete_user_account');
+    } catch (e) {
+      throw Exception('Failed to delete account: $e');
+    }
+  }
+
   Future<void> updateLastActive(String userId) async {
     try {
       await _client.from('profiles').update({
@@ -272,6 +298,28 @@ class AuthRepository {
       }).eq('id', userId);
     } catch (e) {
       debugPrint('Failed to update last active: $e');
+    }
+  }
+
+  Future<void> setOnlineStatus(String userId, bool isOnline) async {
+    try {
+      await _client.from('profiles').update({
+        'is_online': isOnline,
+        'last_active_at': DateTime.now().toUtc().toIso8601String(),
+      }).eq('id', userId);
+    } catch (e) {
+      debugPrint('Failed to set online status: $e');
+    }
+  }
+
+  Future<void> heartbeat(String userId) async {
+    try {
+      await _client.from('profiles').update({
+        'last_active_at': DateTime.now().toUtc().toIso8601String(),
+        'is_online': true,
+      }).eq('id', userId);
+    } catch (e) {
+      debugPrint('Failed to send heartbeat: $e');
     }
   }
 

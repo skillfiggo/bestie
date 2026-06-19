@@ -13,6 +13,9 @@ import 'package:bestie/features/chat/data/repositories/call_repository.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bestie/features/auth/data/providers/auth_providers.dart';
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+
 
 class NearbyView extends ConsumerStatefulWidget {
   const NearbyView({super.key});
@@ -32,7 +35,26 @@ class _NearbyViewState extends ConsumerState<NearbyView> {
   @override
   void initState() {
     super.initState();
+    _loadCachedData();
     _initLocation();
+  }
+
+  Future<void> _loadCachedData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedStr = prefs.getString('cached_nearby_profiles');
+      if (cachedStr != null) {
+        if (mounted) {
+          setState(() {
+            final List<dynamic> list = json.decode(cachedStr);
+            _nearbyProfiles = list.map((item) => ProfileModel.fromMap(Map<String, dynamic>.from(item))).toList();
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading cached nearby profiles: $e');
+    }
   }
 
   Future<void> _initLocation() async {
@@ -200,12 +222,14 @@ class _NearbyViewState extends ConsumerState<NearbyView> {
       String? targetGender;
       
       if (userProfile != null) {
-        if (userProfile.gender == 'male') {
+        final genderLower = userProfile.gender.toLowerCase().trim();
+        if (genderLower == 'male') {
           targetGender = 'female';
-        } else if (userProfile.gender == 'female') {
+        } else if (genderLower == 'female') {
           targetGender = 'male';
         }
       }
+      debugPrint('NearbyView query - user: ${userProfile?.name}, gender: ${userProfile?.gender}, targetGender: $targetGender');
 
       final profiles = await _repository.getNearbyProfiles(
         latitude: _currentPosition!.latitude,
@@ -213,6 +237,14 @@ class _NearbyViewState extends ConsumerState<NearbyView> {
         targetGender: targetGender,
         radiusKm: 50, // Default 50km radius
       );
+
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        prefs.setString('cached_nearby_profiles', json.encode(profiles.map((p) => p.toMap()).toList()));
+      } catch (cacheErr) {
+        debugPrint('Failed to save nearby profiles to cache: $cacheErr');
+      }
+
       if (mounted) {
         setState(() {
           _nearbyProfiles = profiles;
@@ -220,10 +252,20 @@ class _NearbyViewState extends ConsumerState<NearbyView> {
         });
       }
     } catch (e) {
+      debugPrint('Failed to fetch nearby users: $e');
       if (mounted) {
         setState(() {
-          _error = 'Failed to fetch nearby users: $e';
           _isLoading = false;
+          if (_nearbyProfiles.isEmpty) {
+            _error = 'Failed to fetch nearby users: $e';
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('🌐 No internet connection. Showing cached profiles.'),
+                duration: Duration(seconds: 3),
+              ),
+            );
+          }
         });
       }
     }
@@ -331,6 +373,14 @@ class _NearbyViewState extends ConsumerState<NearbyView> {
 
   @override
   Widget build(BuildContext context) {
+    // Reload nearby if gender changes
+    ref.listen<AsyncValue<ProfileModel?>>(userProfileProvider, (previous, next) {
+      final prevGender = previous?.valueOrNull?.gender;
+      final nextGender = next.valueOrNull?.gender;
+      if (nextGender != null && prevGender != nextGender && !_isLoading) {
+        _fetchNearbyUsers();
+      }
+    });
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -400,14 +450,21 @@ class _NearbyViewState extends ConsumerState<NearbyView> {
 
     return RefreshIndicator(
       onRefresh: _fetchNearbyUsers,
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
+      child: GridView.builder(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+          childAspectRatio: 0.58,
+        ),
         itemCount: _nearbyProfiles.length,
         itemBuilder: (context, index) {
           final profile = _nearbyProfiles[index];
           
           return ProfileCard(
             profile: profile,
+            isCompact: true,
             onTap: () {
               Navigator.push(
                 context,

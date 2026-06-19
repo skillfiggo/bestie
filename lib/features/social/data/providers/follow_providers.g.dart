@@ -6,7 +6,7 @@ part of 'follow_providers.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$followRepositoryHash() => r'1534e9ed4d6c553f39db200bfac98591376072e2';
+String _$followRepositoryHash() => r'afa745f8bde582eb58fffc2d7e68cf1c4e7ba9d4';
 
 /// See also [followRepository].
 @ProviderFor(followRepository)
@@ -23,7 +23,7 @@ final followRepositoryProvider = AutoDisposeProvider<FollowRepository>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef FollowRepositoryRef = AutoDisposeProviderRef<FollowRepository>;
-String _$isFollowingHash() => r'4c93f90a9980744038de1ab9f02cae484e5b2187';
+String _$isFollowingHash() => r'd9ba8da697f5558442bd498b781fcc7e4fa073d7';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -162,7 +162,7 @@ class _IsFollowingProviderElement extends AutoDisposeFutureProviderElement<bool>
   String get userId => (origin as IsFollowingProvider).userId;
 }
 
-String _$followerCountHash() => r'bcec67f5efef5c1124d2dfff721b3552d5d98dc5';
+String _$followerCountHash() => r'fc94a39acd3f54cdc0f8d46cb5eb07a098b03cb0';
 
 /// See also [followerCount].
 @ProviderFor(followerCount)
@@ -282,7 +282,7 @@ class _FollowerCountProviderElement
   String get userId => (origin as FollowerCountProvider).userId;
 }
 
-String _$followingCountHash() => r'92eaddfc67c98069762f10f2bd0d5670c7a975dc';
+String _$followingCountHash() => r'30e40857459923c44696b5f32d6954e2ec74cf2e';
 
 /// See also [followingCount].
 @ProviderFor(followingCount)
@@ -403,7 +403,7 @@ class _FollowingCountProviderElement
 }
 
 String _$followersWithProfilesHash() =>
-    r'cb3fdc7a87830e1e77eeb5f40361d2f73b4fc65d';
+    r'5eaa5b0965ee94fc4a22b463a87480bce061c550';
 
 /// See also [followersWithProfiles].
 @ProviderFor(followersWithProfiles)
@@ -530,7 +530,7 @@ class _FollowersWithProfilesProviderElement
 }
 
 String _$followingWithProfilesHash() =>
-    r'74f163893d48880a4ab92e8a4e897b3e0c0f0f57';
+    r'04c6feec1b42a5ed7722d128c65bf3ebb80c8049';
 
 /// See also [followingWithProfiles].
 @ProviderFor(followingWithProfiles)
