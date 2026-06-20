@@ -16,6 +16,7 @@ import 'package:bestie/features/admin/data/repositories/admin_repository.dart';
 import 'package:bestie/core/services/connectivity_service.dart';
 import 'package:bestie/features/after_dark/presentation/screens/after_dark_hub_screen.dart';
 import 'package:bestie/features/ai_chat/presentation/hot_talk_view.dart';
+import 'package:bestie/features/calling/presentation/screens/voice_match_screen.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'dart:convert';
 import 'dart:math' as math;
@@ -512,20 +513,18 @@ class _HomeViewState extends ConsumerState<HomeView> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: _FeatureCard(
-                          label: 'Voice Chats',
+                          label: 'Voice Match',
                           gradient: const LinearGradient(
                             colors: [Color(0xFFAB47BC), Color(0xFF7E57C2)],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
                           icon: Icons.graphic_eq,
-                          badgeIcon: Icons.graphic_eq,
+                          badgeIcon: Icons.shuffle_rounded,
                           onTap: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Voice Chats feature coming soon!'),
-                                duration: Duration(seconds: 2),
-                              ),
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const VoiceMatchScreen()),
                             );
                           },
                         ),

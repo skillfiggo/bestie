@@ -41,8 +41,6 @@ dependencies:
   supabase_flutter: ^2.0.0
   google_sign_in: ^6.2.1
   
-  # Environment variables for secure credential storage
-  flutter_dotenv: ^5.1.0
 
   # State Management
   flutter_riverpod: ^2.5.1
@@ -102,7 +100,6 @@ flutter:
 
   # To add assets to your application, add an assets section, like this:
   assets:
-    - .env
     - assets/images/
     - assets/images/icons/
     - assets/images/avatars/

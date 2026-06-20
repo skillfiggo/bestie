@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'; // For kIsWeb
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final agoraServiceProvider = Provider((ref) => AgoraService());
@@ -19,10 +18,10 @@ class AgoraService {
   Future<void> initialize() async {
     if (_isInitialized) return;
 
-    String appId = dotenv.env['AGORA_APP_ID'] ?? '';
-    debugPrint('🔴 Debug - Loaded Agora App ID: ${appId.isEmpty ? "EMPTY" : "${appId.substring(0, 5)}..."}'); 
+    const String appId = String.fromEnvironment('AGORA_APP_ID');
+    debugPrint('🔴 Debug - Loaded Agora App ID: ${appId.isEmpty ? "EMPTY" : "${appId.substring(0, 5)}..."}');
     if (appId.isEmpty || appId == 'YOUR_AGORA_APP_ID_HERE') {
-      debugPrint('🔴 Agora App ID is missing or invalid in .env');
+      debugPrint('🔴 Agora App ID is missing. Build with: flutter run --dart-define-from-file=dart_defines.json');
       if (appId.isEmpty) return;
     }
 

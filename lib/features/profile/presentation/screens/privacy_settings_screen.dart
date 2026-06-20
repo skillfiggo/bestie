@@ -5,6 +5,7 @@ import 'package:bestie/features/auth/data/providers/auth_providers.dart';
 import 'package:bestie/core/services/supabase_service.dart';
 import 'package:bestie/features/admin/data/repositories/reports_repository.dart';
 import 'package:bestie/features/home/domain/models/profile_model.dart';
+import 'package:bestie/core/widgets/error_state_widget.dart';
 
 // Riverpod provider to load full profiles of blocked users
 final blockedUsersProvider = FutureProvider.autoDispose<List<ProfileModel>>((ref) async {
@@ -119,8 +120,12 @@ class PrivacySettingsScreen extends ConsumerWidget {
       },
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (err, _) =>
-          Scaffold(body: Center(child: Text('Error: $err'))),
+      error: (err, _) => Scaffold(
+        body: ErrorStateWidget(
+          error: err,
+          onRetry: () => ref.invalidate(userProfileProvider),
+        ),
+      ),
     );
   }
 
@@ -402,15 +407,9 @@ class BlockedUsersScreen extends ConsumerWidget {
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text(
-              'Error loading blocked users: $err',
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.red),
-            ),
-          ),
+        error: (err, _) => ErrorStateWidget(
+          error: err,
+          onRetry: () => ref.invalidate(blockedUsersProvider),
         ),
       ),
     );

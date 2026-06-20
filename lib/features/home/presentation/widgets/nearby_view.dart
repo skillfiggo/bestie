@@ -90,7 +90,15 @@ class _NearbyViewState extends ConsumerState<NearbyView> {
         _error = null;
       });
 
-      final position = await Geolocator.getCurrentPosition();
+      // Use AndroidSettings with useMSLAltitude: false to prevent geolocator
+      // from starting NmeaClient, which crashes the JVM on some Android devices
+      // due to a null string being passed to JNI's NewStringUTF (geolocator bug).
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: AndroidSettings(
+          accuracy: LocationAccuracy.high,
+          useMSLAltitude: false, // ← disables NmeaClient, preventing the crash
+        ),
+      );
       setState(() {
         _currentPosition = position;
       });
@@ -422,28 +430,74 @@ class _NearbyViewState extends ConsumerState<NearbyView> {
 
     if (_nearbyProfiles.isEmpty) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.people_outline, size: 64, color: Colors.grey),
-            const SizedBox(height: 16),
-            const Text(
-              'No users found nearby.',
-              style: TextStyle(color: Colors.grey),
-            ),
-            if (_currentPosition != null) ...[
-              const SizedBox(height: 8),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Image.asset(
+                'assets/images/icons/no-user-nearby.png',
+                width: 240,
+                height: 240,
+                fit: BoxFit.contain,
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'No Besties Nearby Yet',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
               Text(
-                'Location: ${_currentPosition!.latitude.toStringAsFixed(2)}, ${_currentPosition!.longitude.toStringAsFixed(2)}',
-                style: const TextStyle(fontSize: 12, color: Colors.grey),
+                'We couldn\'t find any users matching your preferences in your immediate area right now.',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey.shade500,
+                  height: 1.4,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              if (_currentPosition != null) ...[
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    'Location: ${_currentPosition!.latitude.toStringAsFixed(2)}, ${_currentPosition!.longitude.toStringAsFixed(2)}',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 32),
+              ElevatedButton.icon(
+                onPressed: _fetchNearbyUsers,
+                icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+                label: const Text(
+                  'Search Again',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  elevation: 2,
+                ),
               ),
             ],
-            const SizedBox(height: 16),
-            TextButton(
-              onPressed: _fetchNearbyUsers,
-              child: const Text('Refresh'),
-            ),
-          ],
+          ),
         ),
       );
     }

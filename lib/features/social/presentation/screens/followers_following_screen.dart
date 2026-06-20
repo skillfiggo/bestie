@@ -4,6 +4,7 @@ import 'package:bestie/core/constants/app_colors.dart';
 import 'package:bestie/features/social/data/providers/follow_providers.dart';
 import 'package:bestie/features/profile/presentation/screens/user_profile_screen.dart';
 import 'package:bestie/features/social/data/providers/friendship_providers.dart';
+import 'package:bestie/core/widgets/error_state_widget.dart';
 
 class FollowersFollowingScreen extends ConsumerStatefulWidget {
   final String userId;
@@ -149,7 +150,10 @@ class _GenericUserList extends ConsumerWidget {
         );
       },
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (err, stack) => Center(child: Text('Error: $err')),
+      error: (err, stack) => ErrorStateWidget(
+        error: err,
+        onRetry: () => ref.invalidate(provider),
+      ),
     );
   }
 }

@@ -19,36 +19,67 @@ class MomentCard extends ConsumerStatefulWidget {
 class _MomentCardState extends ConsumerState<MomentCard> {
   bool _isProcessing = false;
 
+  // Optimistic UI state — initialised from the widget's data.
+  late bool _isLiked;
+  late int _likeCount;
+
+  @override
+  void initState() {
+    super.initState();
+    _isLiked = widget.moment.isLiked;
+    _likeCount = widget.moment.likes;
+  }
+
+  @override
+  void didUpdateWidget(MomentCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Sync with fresh data from the provider (e.g. after re-fetch).
+    if (oldWidget.moment != widget.moment) {
+      _isLiked = widget.moment.isLiked;
+      _likeCount = widget.moment.likes;
+    }
+  }
+
   Future<void> _handleLike() async {
     if (_isProcessing) return;
 
+    // --- Optimistic update ---
+    final wasLiked = _isLiked;
+    final previousCount = _likeCount;
     setState(() {
       _isProcessing = true;
+      _isLiked = !wasLiked;
+      _likeCount = wasLiked ? (_likeCount - 1).clamp(0, 9999) : _likeCount + 1;
     });
 
     final repository = ref.read(momentRepositoryProvider);
-    
+
     try {
-        if (widget.moment.isLiked) {
-             await repository.unlikeMoment(widget.moment.id);
-        } else {
-             await repository.likeMoment(widget.moment.id);
-        }
-        // Invalidate moments to refresh the list
-        ref.invalidate(momentsProvider);
+      if (wasLiked) {
+        await repository.unlikeMoment(widget.moment.id);
+      } else {
+        await repository.likeMoment(widget.moment.id);
+      }
+      // Re-fetch in background so the list stays accurate.
+      ref.invalidate(momentsProvider);
     } catch (e) {
-        debugPrint('Error liking moment: $e');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to update like: $e')),
-          );
-        }
+      // --- Roll back on failure ---
+      debugPrint('Error liking moment: $e');
+      if (mounted) {
+        setState(() {
+          _isLiked = wasLiked;
+          _likeCount = previousCount;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update like: $e')),
+        );
+      }
     } finally {
-        if (mounted) {
-          setState(() {
-            _isProcessing = false;
-          });
-        }
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+        });
+      }
     }
   }
 
@@ -197,9 +228,9 @@ class _MomentCardState extends ConsumerState<MomentCard> {
           Row(
             children: [
               _InteractionButton(
-                icon: widget.moment.isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                color: widget.moment.isLiked ? Colors.red : Colors.grey.shade600,
-                label: '${widget.moment.likes}',
+                icon: _isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                color: _isLiked ? Colors.red : Colors.grey.shade600,
+                label: '$_likeCount',
                 onTap: _handleLike,
               ),
               const SizedBox(width: 24),

@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:bestie/core/services/supabase_service.dart';
 
 class AuthRepository {
@@ -105,16 +104,16 @@ class AuthRepository {
   Future<AuthResponse> signInWithGoogle() async {
     try {
       // 1. Initialize GoogleSignIn
-      final webClientId = dotenv.env['GOOGLE_WEB_CLIENT_ID'];
-      final iosClientId = dotenv.env['GOOGLE_IOS_CLIENT_ID'];
+      const webClientId = String.fromEnvironment('GOOGLE_WEB_CLIENT_ID');
+      const iosClientId = String.fromEnvironment('GOOGLE_IOS_CLIENT_ID');
 
       debugPrint('Initializing Google Sign-In...');
-      debugPrint('Web Client ID: ${webClientId != null ? "found" : "missing"}');
-      debugPrint('iOS Client ID: ${iosClientId != null ? "found" : "missing"}');
+      debugPrint('Web Client ID: ${webClientId.isNotEmpty ? "found" : "missing"}');
+      debugPrint('iOS Client ID: ${iosClientId.isNotEmpty ? "found" : "missing"}');
 
       final GoogleSignIn googleSignIn = GoogleSignIn(
-        clientId: (kIsWeb || defaultTargetPlatform == TargetPlatform.iOS) ? iosClientId : null,
-        serverClientId: webClientId,
+        clientId: (kIsWeb || defaultTargetPlatform == TargetPlatform.iOS) ? (iosClientId.isNotEmpty ? iosClientId : null) : null,
+        serverClientId: webClientId.isNotEmpty ? webClientId : null,
       );
 
       debugPrint('Attempting googleSignIn.signIn()...');

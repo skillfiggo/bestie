@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bestie/core/constants/app_colors.dart';
 import 'package:bestie/features/profile/data/repositories/withdrawal_repository.dart';
 import 'package:bestie/features/auth/data/providers/auth_providers.dart';
+import 'package:bestie/core/widgets/error_state_widget.dart';
 
 class WithdrawDiamondsScreen extends ConsumerStatefulWidget {
   const WithdrawDiamondsScreen({super.key});
@@ -147,7 +148,10 @@ class _WithdrawDiamondsScreenState extends ConsumerState<WithdrawDiamondsScreen>
       ),
       body: profileAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+        error: (e, _) => ErrorStateWidget(
+          error: e,
+          onRetry: () => ref.invalidate(userProfileProvider),
+        ),
         data: (profile) => Form(
           key: _formKey,
           child: ListView(

@@ -113,35 +113,16 @@ class MomentRepository {
     if (user == null) throw Exception('User not logged in');
 
     try {
-      // 1. Insert into moment_likes
+      // Insert the like — the DB trigger automatically increments likes_count.
       await _client.from('moment_likes').insert({
         'user_id': user.id,
         'moment_id': momentId,
       });
-
-      // 2. Increment ONLY if insert succeeded
-      // We assume if line 82 throws (duplicate key), we won't reach here.
-      // Ideally use a Trigger, but for now we manually increment.
-      try {
-        await _client.rpc('increment_moment_likes', params: {'row_id': momentId});
-      } catch (_) {
-         // Fallback if specific RPC missing, try generic or manual
-         try {
-            await _client.rpc('increment_likes', params: {'t_name': 'moments', 'row_id': momentId});
-         } catch (e) {
-            // Manual increment (race condition risk but acceptable for MVP)
-            final moment = await _client.from('moments').select('likes_count').eq('id', momentId).single();
-            int currentLikes = moment['likes_count'] as int;
-            await _client.from('moments').update({'likes_count': currentLikes + 1}).eq('id', momentId);
-         }
-      }
     } catch (e) {
       if (e is PostgrestException && e.code == '23505') {
-        // Unique violation code (duplicate key value violates unique constraint)
-        // User already liked this moment. Do nothing efficiently.
-        return; 
+        // Duplicate key — user already liked this moment. Safe to ignore.
+        return;
       }
-      // Re-throw other errors
       throw Exception('Failed to like moment: $e');
     }
   }
@@ -151,18 +132,12 @@ class MomentRepository {
     if (user == null) throw Exception('User not logged in');
 
     try {
-      await _client.from('moment_likes').delete().eq('user_id', user.id).eq('moment_id', momentId);
-      
-      // Decrement count
-      try {
-         await _client.rpc('decrement_likes', params: {'t_name': 'moments', 'row_id': momentId});
-      } catch (_) {
-         final moment = await _client.from('moments').select('likes_count').eq('id', momentId).single();
-         int currentLikes = moment['likes_count'] as int;
-         if (currentLikes > 0) {
-            await _client.from('moments').update({'likes_count': currentLikes - 1}).eq('id', momentId);
-         }
-      }
+      // Delete the like — the DB trigger automatically decrements likes_count.
+      await _client
+          .from('moment_likes')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('moment_id', momentId);
     } catch (e) {
       throw Exception('Failed to unlike moment: $e');
     }

@@ -4,6 +4,7 @@ import 'package:bestie/core/constants/app_colors.dart';
 import 'package:bestie/features/profile/data/providers/profile_visit_providers.dart';
 import 'package:bestie/features/home/domain/models/profile_model.dart';
 import 'package:bestie/features/profile/presentation/screens/user_profile_screen.dart';
+import 'package:bestie/core/widgets/error_state_widget.dart';
 
 class VisitorView extends ConsumerWidget {
   const VisitorView({super.key});
@@ -94,7 +95,10 @@ class _VisitorsList extends ConsumerWidget {
         );
       },
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (err, stack) => Center(child: Text('Error: $err')),
+      error: (err, stack) => ErrorStateWidget(
+        error: err,
+        onRetry: () => ref.invalidate(provider),
+      ),
     );
   }
 }

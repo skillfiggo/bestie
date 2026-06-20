@@ -13,11 +13,13 @@ import 'package:screen_protector/screen_protector.dart';
 import 'package:bestie/core/services/audio_service.dart';
 
 class CallScreen extends ConsumerStatefulWidget {
-  final String channelId; // Using chat_id as channel_id
+  final String channelId; // Using chat_id as channel_id (or Agora channel for random match)
   final String otherUserId; // Receiver ID
   final bool isVideo;
   final bool isInitiator; // True if this user started the call
   final String? callHistoryId; // For receiver to listen to same record
+  final bool isRandomMatch; // True for random voice match calls (no DB call record, no ringtone)
+  final String? dmChatId; // Pre-created DM chat ID for random match calls
 
   const CallScreen({
     super.key,
@@ -26,6 +28,8 @@ class CallScreen extends ConsumerStatefulWidget {
     this.isVideo = true,
     this.isInitiator = false,
     this.callHistoryId, // Optional, provided to receiver
+    this.isRandomMatch = false,
+    this.dmChatId,
   });
 
   @override
@@ -128,11 +132,11 @@ class _CallScreenState extends ConsumerState<CallScreen> {
       // 3. Fetch Initial Token
       await _fetchAndUpdateToken();
       
-      // 4. Create Call Record if Initiator
+      // 4. Create Call Record if Initiator (skip for random match — queue table handles signaling)
       final user = ref.read(authRepositoryProvider).getCurrentUser();
-      if (user != null && widget.isInitiator && _callHistoryId.isEmpty) {
+      if (user != null && widget.isInitiator && _callHistoryId.isEmpty && !widget.isRandomMatch) {
           _callHistoryId = await ref.read(callRepositoryProvider).startCall(
-            channelId: widget.channelId,
+            channelId: widget.dmChatId ?? widget.channelId,
             callerId: user.id,
             receiverId: widget.otherUserId,
             mediaType: widget.isVideo ? 'video' : 'voice',
@@ -140,8 +144,8 @@ class _CallScreenState extends ConsumerState<CallScreen> {
           await _setupCallStatusListener();
       }
 
-      // 5. Start Outgoing Ringtone if Initiator
-      if (widget.isInitiator && _remoteUid == null && mounted) {
+      // 5. Start Outgoing Ringtone if Initiator (skip for random match — both users are already online)
+      if (widget.isInitiator && _remoteUid == null && mounted && !widget.isRandomMatch) {
         ref.read(audioServiceProvider).playOutgoingRingtone();
       }
     } catch (e) {

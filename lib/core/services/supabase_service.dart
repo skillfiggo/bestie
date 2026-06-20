@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class SupabaseService {
   static SupabaseService? _instance;
@@ -13,25 +12,15 @@ class SupabaseService {
     return _instance!;
   }
 
-  /// Initialize Supabase with credentials from .env file
+  /// Initialize Supabase with credentials compiled in via --dart-define-from-file
   static Future<void> initialize() async {
     try {
+      const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
+      const supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
 
-
-      final supabaseUrl = dotenv.env['SUPABASE_URL'];
-      final supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'];
-
-      if (supabaseUrl == null || supabaseAnonKey == null) {
+      if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
         throw Exception(
-          'Supabase credentials not found. Please check your .env file.',
-        );
-      }
-
-      if (supabaseUrl.contains('your-project') || 
-          supabaseAnonKey.contains('your-anon-key')) {
-        throw Exception(
-          'Please update .env file with your actual Supabase credentials.\n'
-          'Get them from: https://app.supabase.com/project/_/settings/api',
+          'Supabase credentials not found. Build with: flutter run --dart-define-from-file=dart_defines.json',
         );
       }
 
